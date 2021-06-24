@@ -57,12 +57,11 @@ int main()
     PetriNet pn({at1,use1,done1,drive1,mutex,at2,use2,done2,drive2},{toat1,touse1,todone1,todrive1,toat2,touse2,todone2,todrive2},arcs);
     pn.printdot();
     mutex->addtokens(1);
-    // Deliberately add 2 tokens, to ensure that transition doesn't deadlock if
+    // Deliberately add 2 tokens, to test that transition doesn't deadlock if
     // token supply remains high after transition (without dipping to low in
     // between)
     drive1->addtokens(2);
     drive2->addtokens(2);
-    //pn.quit();
     pn.wait();
     pn.deleteElems();
 }
