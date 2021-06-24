@@ -1,3 +1,6 @@
+#ifndef _DOT_H
+#define _DOT_H
+
 #include<list>
 #include<fstream>
 #include<tuple>
@@ -61,3 +64,5 @@ public:
     DGraph(DNodeList& nodes, DEdgeList& edges, Props props=Props()) :
         _nodes(nodes), _edges(edges), _gprops(props) {}
 };
+
+#endif
