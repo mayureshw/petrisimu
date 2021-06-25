@@ -254,7 +254,7 @@ public:
 
     void printdot(string filename="petri.dot")
     {
-        DNodeList nl; // = {DNode("1",(Proplist){{"shape","circle"}}), DNode("2")};
+        DNodeList nl;
         for(auto n:_places) nl.push_back(n->dnode());
         for(auto n:_transitions) nl.push_back(n->dnode());
         DEdgeList el;
