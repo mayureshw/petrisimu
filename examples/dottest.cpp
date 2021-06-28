@@ -1,5 +1,3 @@
-#include <iostream>
-#include <list>
 #include "dot.h"
 
 int main()
