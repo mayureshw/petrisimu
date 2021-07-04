@@ -10,6 +10,12 @@ using namespace std;
 
 typedef list<tuple<string,string>> Proplist;
 
+class DElem
+{
+public:
+    static string q(string s) { return "\"" + s + "\""; }
+};
+
 class Props
 {
     Proplist _props;
@@ -23,21 +29,21 @@ public:
     Props(Proplist pl={}) : _props(pl) {}
 };
 
-class DNode
+class DNode : public DElem
 {
     string _id;
     Props _props;
 public:
-    string str() { return _id + " " + _props.str(); }
+    string str() { return q(_id) + " " + _props.str(); }
     DNode(string id, Props props=Props()) : _id(id), _props(props) {}
 };
 
-class DEdge
+class DEdge : public DElem
 {
     string _id1, _id2;
     Props _props;
 public:
-    string str() { return _id1 + " -> " + _id2 + " " + _props.str(); }
+    string str() { return q(_id1) + " -> " + q(_id2) + " " + _props.str(); }
     DEdge(string id1, string id2, Props props=Props()) : _id1(id1), _id2(id2), _props(props) {}
 };
 
