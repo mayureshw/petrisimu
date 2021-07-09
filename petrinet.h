@@ -28,10 +28,12 @@ using namespace std;
 class PNArc;
 class PNPlace;
 class PNTransition;
+class PNNode;
 class PNElement;
 typedef list<PNArc*> Arcs;
 typedef list<PNPlace*> Places;
 typedef list<PNTransition*> Transitions;
+typedef list<PNNode*> Nodes;
 typedef list<PNElement*> Elements;
 
 // Interfaces to resolve inter-dependencies
