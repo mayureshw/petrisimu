@@ -28,9 +28,11 @@ using namespace std;
 class PNArc;
 class PNPlace;
 class PNTransition;
+class PNElement;
 typedef list<PNArc*> Arcs;
 typedef list<PNPlace*> Places;
 typedef list<PNTransition*> Transitions;
+typedef list<PNElement*> Elements;
 
 // Interfaces to resolve inter-dependencies
 class IPetriNet : public MTEngine
@@ -47,18 +49,26 @@ public:
 };
 
 
-class PNArc
+class PNElement
+{
+public:
+    typedef enum {PLACE,TRANSITION,ARC} Etyp;
+    virtual Etyp typ()=0;
+};
+
+class PNArc : public PNElement
 {
 public:
     PNPlace* _place;
     PNTransition* _transition;
     unsigned _wt;
     virtual DEdge dedge() = 0;
+    Etyp typ() { return ARC; }
     PNArc(PNPlace* p, PNTransition* t, unsigned wt) : _place(p), _transition(t), _wt(wt) {}
     virtual ~PNArc() {}
 };
 
-class PNNode
+class PNNode : public PNElement
 {
     queue<Work> _q;
     mutex _q_mutex;
@@ -128,6 +138,7 @@ class PNPlace : public PNNode
     }
 public:
     unsigned _tokens = 0;
+    Etyp typ() { return PLACE; }
     virtual void addactions() {}
     virtual void deductactions() {}
     void lock() { _tokenmutex.lock(); }
@@ -188,6 +199,7 @@ class PNTransition : public PNNode, IPNTransition
     }
 public:
     virtual void enabledactions() {}
+    Etyp typ() { return TRANSITION; }
     void gotEnoughTokens()
     {
         _enabledPlaceCntMutex.lock();
@@ -246,10 +258,16 @@ public:
 
 class PetriNet : public IPetriNet
 {
+    static const unsigned _defaultThreads = 4;
     Places _places;
     Transitions _transitions;
     Arcs _arcs;
 
+    void setpn()
+    {
+        for(auto n:_places) n->setpn(this);
+        for(auto n:_transitions) n->setpn(this);
+    }
 public:
 
     void printdot(string filename="petri.dot")
@@ -273,11 +291,21 @@ public:
         for(auto e:_arcs) delete e;
     }
 
-    PetriNet(Places places, Transitions transitions, Arcs arcs, unsigned nThreads=4) :
+    PetriNet(Places places, Transitions transitions, Arcs arcs, unsigned nThreads=_defaultThreads) :
         _places(places), _transitions(transitions), _arcs(arcs), IPetriNet(nThreads)
     {
-        for(auto n:_places) n->setpn(this);
-        for(auto n:_transitions) n->setpn(this);
+        setpn();
+    }
+    PetriNet(Elements elements, unsigned nThreads=_defaultThreads) : IPetriNet(nThreads)
+    {
+        for(auto e:elements)
+            switch(e->typ())
+            {
+                case PNElement::PLACE: _places.push_back((PNPlace*)e); break;
+                case PNElement::TRANSITION: _transitions.push_back((PNTransition*)e); break;
+                case PNElement::ARC: _arcs.push_back((PNArc*)e); break;
+            }
+        setpn();
     }
 };
 
