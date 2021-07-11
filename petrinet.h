@@ -336,10 +336,13 @@ public:
 
 class PNDbgTransition : public PNTransition
 {
+    function<void()> _enabledactions = [](){};
 public:
+    void setEnabledActions(function<void()> af) { _enabledactions = af; }
     void enabledactions()
     {
         cout << "Transition " << _name << " enabled" << endl;
+        _enabledactions();
     }
     template <typename... Arg> PNDbgTransition(Arg... args) : PNTransition(args...) {}
 };
