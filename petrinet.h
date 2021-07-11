@@ -172,7 +172,7 @@ public:
     virtual ~PNPlace() {}
 };
 
-class PNTransition : public PNNode, IPNTransition
+class PNTransition : public IPNTransition, public PNNode
 {
     unsigned _enabledPlaceCnt = 0;
     mutex _enabledPlaceCntMutex;
