@@ -12,7 +12,7 @@ int main()
         *a1 = new PNPTArc(p1,t1),
         *a2 = new PNTPArc(t1,p2),
         *a3 = new PNPTArc(p2,t2);
-    PetriNet pn({p1,p2},{t1,t2},{a1,a2,a3});
+    PetriNet pn({p1,p2,t1,t2,a1,a2,a3});
     pn.printdot();
     pn.deleteElems();
 }
