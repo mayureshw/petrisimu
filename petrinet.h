@@ -199,8 +199,11 @@ class PNTransition : public IPNTransition, public PNNode
         }
         else return false;
     }
+protected:
+    function<void()> _enabledactions = [](){};
 public:
-    virtual void enabledactions() {}
+    void setEnabledActions(function<void()> af) { _enabledactions = af; }
+    virtual void enabledactions() { _enabledactions(); }
     Etyp typ() { return TRANSITION; }
     void gotEnoughTokens()
     {
@@ -336,9 +339,7 @@ public:
 
 class PNDbgTransition : public PNTransition
 {
-    function<void()> _enabledactions = [](){};
 public:
-    void setEnabledActions(function<void()> af) { _enabledactions = af; }
     void enabledactions()
     {
         cout << "Transition " << _name << " enabled" << endl;
