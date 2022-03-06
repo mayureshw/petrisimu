@@ -120,6 +120,7 @@ public:
 
 class PNPlace : public PNNode
 {
+    function<void()> _addactions = [](){};
     unsigned _capacity;
     mutex _tokenmutex;
     void _addtokens(unsigned newtokens)
@@ -141,7 +142,8 @@ class PNPlace : public PNNode
 public:
     unsigned _tokens = 0;
     Etyp typ() { return PLACE; }
-    virtual void addactions() {}
+    void setAddActions(function<void()> af) { _addactions = af; }
+    virtual void addactions() { _addactions(); }
     virtual void deductactions() {}
     void lock() { _tokenmutex.lock(); }
     bool lockIfEnough(unsigned mintokens)
