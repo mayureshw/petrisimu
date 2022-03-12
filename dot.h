@@ -23,7 +23,7 @@ public:
     string str()
     {
         string label = "[";
-        for(auto const& pv:_props) label += get<0>(pv) + "=" + get<1>(pv) + ",";
+        for(auto const& pv:_props) label += get<0>(pv) + "=\"" + get<1>(pv) + "\",";
         return label + "]";
     }
     Props(Proplist pl={}) : _props(pl) {}

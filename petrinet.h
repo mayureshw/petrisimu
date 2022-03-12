@@ -39,7 +39,9 @@ typedef list<PNElement*> Elements;
 // Interfaces to resolve inter-dependencies
 class IPetriNet : public MTEngine
 {
+    int _idcntr = 0;
 public:
+    int getIncId() { return _idcntr++; }
     IPetriNet(unsigned nThreads) : MTEngine(nThreads) {}
 };
 
@@ -75,6 +77,7 @@ class PNNode : public PNElement
     queue<Work> _q;
     mutex _q_mutex;
     bool soughtslot = false;
+    int _nodeid;
     void dowork()
     {
         while(true)
@@ -112,9 +115,14 @@ public:
         }
     }
     const string _name;
-    void setpn(IPetriNet* pn) { _pn = pn; }
+    void setpn(IPetriNet* pn)
+    {
+        _pn = pn;
+        _nodeid = _pn->getIncId();
+    }
     void addiarc(PNArc* a) { _iarcs.push_back(a); }
     void addoarc(PNArc* a) { _oarcs.push_back(a); }
+    string idstr() { return to_string(_nodeid); }
     PNNode(string name) : _name(name) {}
 };
 
@@ -168,7 +176,7 @@ public:
                 ((IPNTransition*)oarc->_transition)->notEnoughTokens();
     }
     void addtokens(unsigned newtokens) { addwork(bind(&PNPlace::_addtokens,this,newtokens)); }
-    DNode dnode() { return DNode(_name); }
+    DNode dnode() { return DNode(idstr(),(Proplist){{"label",_name}}); }
     // capacity 0 means place can hold unlimited tokens
     PNPlace(string name,unsigned capacity=0) : PNNode(name), _capacity(capacity) {}
     virtual ~PNPlace() {}
@@ -220,9 +228,9 @@ public:
         _enabledPlaceCnt--;
         _enabledPlaceCntMutex.unlock();
     }
-    DNode dnode() { return DNode(_name,(Proplist){{"shape","rectangle"}}); }
+    DNode dnode() { return DNode(idstr(),(Proplist){{"shape","rectangle"},{"label",_name}}); }
     // Although tryTrigger is called only when preceding places have enough
-    // takens, there can be other contenders for those tokens who may consume
+    // tokens, there can be other contenders for those tokens who may consume
     // them, hence we need to check again whether this transition can fire by
     // holding all predecessor places' counts under a lock
     void tryTrigger()
@@ -243,7 +251,7 @@ public:
 class PNPTArc : public PNArc
 {
 public:
-    DEdge dedge() { return DEdge(_place->_name,_transition->_name); }
+    DEdge dedge() { return DEdge(_place->idstr(),_transition->idstr()); }
     PNPTArc(PNPlace* p, PNTransition* t, unsigned wt=1) : PNArc(p,t,wt)
     {
         _place->addoarc(this);
@@ -254,7 +262,7 @@ public:
 class PNTPArc : public PNArc
 {
 public:
-    DEdge dedge() { return DEdge(_transition->_name,_place->_name); }
+    DEdge dedge() { return DEdge(_transition->idstr(),_place->idstr()); }
     PNTPArc(PNTransition* t, PNPlace* p, unsigned wt=1) : PNArc(p,t,wt)
     {
         _transition->addoarc(this);
