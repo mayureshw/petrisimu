@@ -237,7 +237,7 @@ public:
     void notEnoughTokens()
     {
         _enabledPlaceCntMutex.lock();
-        _enabledPlaceCnt--;
+        if( _enabledPlaceCnt > 0 ) _enabledPlaceCnt--;
         _enabledPlaceCntMutex.unlock();
     }
     DNode dnode() { return DNode(idstr(),(Proplist){{"shape","rectangle"},{"label",_name}}); }
