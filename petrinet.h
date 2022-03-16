@@ -129,14 +129,25 @@ public:
 class PNPlace : public PNNode
 {
     function<void()> _addactions = [](){};
+    function<list<int>()> _arcchooser = NULL;
     unsigned _capacity;
     mutex _tokenmutex;
     void _addtokens(unsigned newtokens)
     {
+        Arcs eligibleArcs;
+        if ( _arcchooser != NULL )
+        {
+            list<int> arcindices = _arcchooser();
+            for(auto i:arcindices)
+                eligibleArcs.push_back(_oarcs[i]);
+        }
+        else
+            eligibleArcs = _oarcs;
+
         lock();
         unsigned oldcnt = _tokens;
         _tokens += newtokens;
-        for(auto oarc:_oarcs)
+        for(auto oarc:eligibleArcs)
             // inform the transition only if we crossed the threshold now
             // Think, whether we want to randomize the sequence of oarc for non
             // determinism Of course, without it also the behavior is correct,
@@ -150,6 +161,7 @@ class PNPlace : public PNNode
 public:
     unsigned _tokens = 0;
     Etyp typ() { return PLACE; }
+    void setArcChooser(function<list<int>()> f) { _arcchooser = f; }
     void setAddActions(function<void()> af) { _addactions = af; }
     virtual void addactions() { _addactions(); }
     virtual void deductactions() {}
