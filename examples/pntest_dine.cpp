@@ -25,7 +25,7 @@ public:
     list<PNDbgTransition*> transitions = {
         take_lfork, strt_eating, strt_thinking
         };
-    list<PNArc*> arcs = {
+    Arcs arcs = {
         new PNPTArc(thinking,take_lfork),
         new PNPTArc(have_lfork,strt_eating),
         new PNPTArc(eating,strt_thinking),
@@ -48,7 +48,7 @@ public:
         vector<Diner> diners;
         list<PNPlace*> places;
         list<PNTransition*> transitions;
-        list<PNArc*> arcs;
+        Arcs arcs;
         for(int i;i<nDiners;i++) diners.push_back(Diner(i));
         for(int i;i<nDiners;i++)
         {

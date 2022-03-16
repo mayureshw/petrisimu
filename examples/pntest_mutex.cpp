@@ -29,7 +29,7 @@ int main()
         *todone2 = new PNDbgTransition("todone2"),
         *todrive2 = new PNDbgTransition("todrive2");
 
-    list<PNArc*> arcs = {
+    Arcs arcs = {
         new PNPTArc(at1,touse1),
         new PNPTArc(use1,todone1),
         new PNPTArc(done1,todrive1),

@@ -30,7 +30,7 @@ class PNPlace;
 class PNTransition;
 class PNNode;
 class PNElement;
-typedef list<PNArc*> Arcs;
+typedef vector<PNArc*> Arcs; // a vector to aid filtering by indices
 typedef list<PNPlace*> Places;
 typedef list<PNTransition*> Transitions;
 typedef list<PNNode*> Nodes;
