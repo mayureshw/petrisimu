@@ -16,25 +16,37 @@ typedef function<void()> Work;
 // TODO: Make use of priority queue
 class MTEngine
 {
+    const unsigned _lqthreshold = 2; // Add to _gq if lq size exeeds this (TODO: parameterize this?)
     list<thread*> _threads;
-    queue<Work> _q;
-    mutex _q_mutex;
+    static thread_local queue<Work> _lq; // NOTE: Application must declare it in any one cpp file
+    queue<Work> _gq;
+    mutex _gq_mutex;
     bool _quit = false;
     int _sleepms = 100; // if queue is empty sleep for these many ms
 
+    void dolocal()
+    {
+        while( not _lq.empty() )
+        {
+            auto work = _lq.front();
+            _lq.pop();
+            work();
+        }
+    }
     void dowork()
     {
         while(true)
         {
+            dolocal();
             bool qempty;
             Work work;
             {
-                const lock_guard<mutex> lockq(_q_mutex);
-                qempty = _q.empty();
+                const lock_guard<mutex> lockq(_gq_mutex);
+                qempty = _gq.empty();
                 if(!qempty)
                 {
-                    work = _q.front();
-                    _q.pop();
+                    work = _gq.front();
+                    _gq.pop();
                 }
             }
             if(qempty)
@@ -45,12 +57,16 @@ class MTEngine
             else work();
         }
     }
-
 public:
+    void addworkg(Work work)
+    {
+        const lock_guard<mutex> lockq(_gq_mutex);
+        _gq.push(work);
+    }
     void addwork(Work work)
     {
-        const lock_guard<mutex> lockq(_q_mutex);
-        _q.push(work);
+        if ( _lq.size() > _lqthreshold ) addworkg(work);
+        else _lq.push(work);
     }
 
     // Set to quit when the queue is found empty
@@ -58,6 +74,7 @@ public:
 
     void wait()
     {
+        dowork(); // Let main thread also work
         for(auto t:_threads)
         {
             t->join();
@@ -67,7 +84,8 @@ public:
 
     MTEngine(int nThreads)
     {
-        for(int i=0; i<nThreads; i++) _threads.push_back(new thread(&MTEngine::dowork,this));
+        // We rope in main thread once it invokes wait hence start 1 thread less
+        for(int i=0; i<nThreads-1; i++) _threads.push_back(new thread(&MTEngine::dowork,this));
     }
 };
 
