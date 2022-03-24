@@ -58,14 +58,13 @@ class MTEngine
         }
     }
 public:
-    void addworkg(Work work)
+    void addwork(Work& work)
     {
-        const lock_guard<mutex> lockq(_gq_mutex);
-        _gq.push(work);
-    }
-    void addwork(Work work)
-    {
-        if ( _lq.size() > _lqthreshold ) addworkg(work);
+        if ( _lq.size() > _lqthreshold )
+        {
+            const lock_guard<mutex> lockq(_gq_mutex);
+            _gq.push(work);
+        }
         else _lq.push(work);
     }
 

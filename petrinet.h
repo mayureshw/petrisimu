@@ -97,7 +97,9 @@ class PNPlace : public PNNode
     function<list<int>()> _arcchooser = NULL;
     unsigned _capacity;
     mutex _tokenmutex;
-    void _addtokens(unsigned newtokens)
+public:
+    // This can be put on queue by adding a wrapper that does addwork, for granularity reason it wasn't
+    void addtokens(unsigned newtokens)
     {
         Arcs eligibleArcs;
         if ( _arcchooser != NULL )
@@ -123,7 +125,6 @@ class PNPlace : public PNNode
         unlock();
         addactions();
     }
-public:
     unsigned _tokens = 0;
     Etyp typ() { return PLACE; }
     void setArcChooser(function<list<int>()> f) { _arcchooser = f; }
@@ -152,7 +153,6 @@ public:
             if( _tokens < oarc->_wt && oldcnt >= oarc->_wt )
                 ((IPNTransition*)oarc->_transition)->notEnoughTokens();
     }
-    void addtokens(unsigned newtokens) { _pn->addwork(bind(&PNPlace::_addtokens,this,newtokens)); }
     DNode dnode() { return DNode(idstr(),(Proplist){{"label",_name}}); }
     // capacity 0 means place can hold unlimited tokens
     PNPlace(string name,unsigned capacity=0) : PNNode(name), _capacity(capacity) {}
@@ -161,6 +161,7 @@ public:
 
 class PNTransition : public IPNTransition, public PNNode
 {
+    Work _tryTriggerWork = bind(&PNTransition::tryTrigger,this);
     unsigned _enabledPlaceCnt = 0;
     mutex _enabledPlaceCntMutex;
     bool haveEnoughTokens() { return _enabledPlaceCnt == _iarcs.size(); }
@@ -196,7 +197,7 @@ public:
     {
         _enabledPlaceCntMutex.lock();
         _enabledPlaceCnt++;
-        if(haveEnoughTokens()) _pn->addwork(bind(&PNTransition::tryTrigger,this));
+        if(haveEnoughTokens()) _pn->addwork(_tryTriggerWork);
         _enabledPlaceCntMutex.unlock();
     }
     void notEnoughTokens()
