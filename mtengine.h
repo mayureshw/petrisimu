@@ -7,6 +7,7 @@
 #include <thread>
 #include <chrono>
 #include <functional>
+#include <condition_variable>
   
 using namespace std;
 
@@ -21,8 +22,8 @@ class MTEngine
     static thread_local queue<Work> _lq; // NOTE: Application must declare it in any one cpp file
     queue<Work> _gq;
     mutex _gq_mutex;
+    condition_variable _gq_cvar;
     bool _quit = false;
-    int _sleepms = 100; // if queue is empty sleep for these many ms
 
     void dolocal()
     {
@@ -52,7 +53,11 @@ class MTEngine
             if(qempty)
             {
                 if(_quit) break;
-                else this_thread::sleep_for(chrono::milliseconds(_sleepms));
+                else
+                {
+                    unique_lock<mutex> ulockq(_gq_mutex);
+                    _gq_cvar.wait(ulockq, []{return true;} );
+                }
             }
             else work();
         }
@@ -62,8 +67,11 @@ public:
     {
         if ( _lq.size() > _lqthreshold )
         {
-            const lock_guard<mutex> lockq(_gq_mutex);
-            _gq.push(work);
+            {
+                const lock_guard<mutex> lockq(_gq_mutex);
+                _gq.push(work);
+            }
+            _gq_cvar.notify_one();
         }
         else _lq.push(work);
     }
