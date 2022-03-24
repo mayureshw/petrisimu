@@ -74,46 +74,11 @@ public:
 
 class PNNode : public PNElement
 {
-    queue<Work> _q;
-    mutex _q_mutex;
-    bool soughtslot = false;
     int _nodeid;
-    void dowork()
-    {
-        while(true)
-        {
-            Work work;
-            {
-                const lock_guard<mutex> lockq(_q_mutex);
-                bool qempty = _q.empty();
-                if(qempty)
-                {
-                    soughtslot = false;
-                    break;
-                }
-                else
-                {
-                    work = _q.front();
-                    _q.pop();
-                }
-            }
-            work();
-        }
-    }
 public:
     IPetriNet* _pn;
     Arcs _iarcs;
     Arcs _oarcs;
-    void addwork(Work work)
-    {
-        const lock_guard<mutex> lockq(_q_mutex);
-        _q.push(work);
-        if (!soughtslot)
-        {
-            _pn->addwork(bind(&PNNode::dowork,this));
-            soughtslot = true;
-        }
-    }
     const string _name;
     void setpn(IPetriNet* pn)
     {
@@ -187,7 +152,7 @@ public:
             if( _tokens < oarc->_wt && oldcnt >= oarc->_wt )
                 ((IPNTransition*)oarc->_transition)->notEnoughTokens();
     }
-    void addtokens(unsigned newtokens) { addwork(bind(&PNPlace::_addtokens,this,newtokens)); }
+    void addtokens(unsigned newtokens) { _pn->addwork(bind(&PNPlace::_addtokens,this,newtokens)); }
     DNode dnode() { return DNode(idstr(),(Proplist){{"label",_name}}); }
     // capacity 0 means place can hold unlimited tokens
     PNPlace(string name,unsigned capacity=0) : PNNode(name), _capacity(capacity) {}
@@ -231,7 +196,7 @@ public:
     {
         _enabledPlaceCntMutex.lock();
         _enabledPlaceCnt++;
-        if(haveEnoughTokens()) addwork(bind(&PNTransition::tryTrigger,this));
+        if(haveEnoughTokens()) _pn->addwork(bind(&PNTransition::tryTrigger,this));
         _enabledPlaceCntMutex.unlock();
     }
     void notEnoughTokens()
