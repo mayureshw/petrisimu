@@ -42,7 +42,6 @@ class IPetriNet : public MTEngine
     int _idcntr = 0;
 public:
     int getIncId() { return _idcntr++; }
-    IPetriNet(unsigned nThreads) : MTEngine(nThreads) {}
 };
 
 class IPNTransition
@@ -284,12 +283,12 @@ public:
         for(auto e:_arcs) delete e;
     }
 
-    PetriNet(Places places, Transitions transitions, Arcs arcs, unsigned nThreads=_defaultThreads) :
-        _places(places), _transitions(transitions), _arcs(arcs), IPetriNet(nThreads)
+    PetriNet(Places places, Transitions transitions, Arcs arcs) :
+        _places(places), _transitions(transitions), _arcs(arcs)
     {
         setpn();
     }
-    PetriNet(Elements elements, unsigned nThreads=_defaultThreads) : IPetriNet(nThreads)
+    PetriNet(Elements elements)
     {
         for(auto e:elements)
             switch(e->typ())
