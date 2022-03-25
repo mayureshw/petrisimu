@@ -97,7 +97,7 @@ public:
         cout << "MTEngine : nThreads set to " << nThreads << endl;
 
         char *lqthresholdvar = getenv("LQTHRESHOLD");
-        unsigned _lqthreshold = lqthresholdvar ? stoi(lqthresholdvar) : 2;
+        _lqthreshold = lqthresholdvar ? stoi(lqthresholdvar) : 2;
         cout << "MTEngine : lqthreshold set to " << _lqthreshold << endl;
 
         // We rope in main thread once it invokes wait hence start 1 thread less
