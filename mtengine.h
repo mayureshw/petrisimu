@@ -18,7 +18,7 @@ typedef function<void()> Work;
 // TODO: Make use of priority queue
 class MTEngine
 {
-    const unsigned _lqthreshold; // Add work to _gq if _lq size exeeds this
+    unsigned _lqthreshold; // Add work to _gq if _lq size exeeds this
     list<thread*> _threads;
     static thread_local queue<Work> _lq; // NOTE: Application must declare it in any one cpp file
     queue<Work> _gq;
@@ -90,11 +90,15 @@ public:
         }
     }
 
-    MTEngine() : _lqthreshold(2)
+    MTEngine()
     {
         char *nthreadsvar = getenv("NTHREADS");
         unsigned nThreads = nthreadsvar ? stoi(nthreadsvar) : 1;
         cout << "MTEngine : nThreads set to " << nThreads << endl;
+
+        char *lqthresholdvar = getenv("LQTHRESHOLD");
+        unsigned _lqthreshold = lqthresholdvar ? stoi(lqthresholdvar) : 2;
+        cout << "MTEngine : lqthreshold set to " << _lqthreshold << endl;
 
         // We rope in main thread once it invokes wait hence start 1 thread less
         for(int i=0; i<nThreads-1; i++) _threads.push_back(new thread(&MTEngine::dowork,this));
