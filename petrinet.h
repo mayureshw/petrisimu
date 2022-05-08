@@ -262,6 +262,44 @@ class PetriNet : public IPetriNet
     }
 public:
 
+    // returns intermediate node if it was inserted between PP/TT else NULL
+    // adds the created arc(s) and intermediate node (if any) to Elements pnes
+    // For intermediate node (if any) optional argument 'name' can be passed
+    static PNNode* createArc(PNNode *n1, PNNode *n2, Elements& pnes, string name = "")
+    {
+        if ( n1->typ() == PNElement::TRANSITION )
+        {
+            if ( n2->typ() == PNElement::TRANSITION )
+            {
+                auto *dummy = new PNPlace(name);
+                pnes.push_back(dummy);
+                pnes.push_back(new PNTPArc((PNTransition*)n1,dummy));
+                pnes.push_back(new PNPTArc(dummy,(PNTransition*)n2));
+                return dummy;
+            }
+            else
+            {
+                pnes.push_back(new PNTPArc((PNTransition*)n1,(PNPlace*)n2));
+                return NULL;
+            }
+        }
+        else
+        {
+            if ( n2->typ() == PNElement::TRANSITION )
+            {
+                pnes.push_back(new PNPTArc((PNPlace*)n1,(PNTransition*)n2));
+                return NULL;
+            }
+            else
+            {
+                auto *dummy = new PNTransition(name);
+                pnes.push_back(dummy);
+                pnes.push_back(new PNPTArc((PNPlace*)n1,dummy));
+                pnes.push_back(new PNTPArc(dummy,(PNPlace*)n2));
+                return dummy;
+            }
+        }
+    }
     void printdot(string filename="petri.dot")
     {
         DNodeList nl;
