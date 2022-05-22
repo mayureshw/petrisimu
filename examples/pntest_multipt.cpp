@@ -1,5 +1,5 @@
 #include "petrinet.h"
-
+thread_local queue<Work> MTEngine::_lq;
 int main()
 {
     auto

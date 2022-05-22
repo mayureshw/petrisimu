@@ -1,7 +1,7 @@
 #include <string>
 #include <vector>
 #include "petrinet.h"
-
+thread_local queue<Work> MTEngine::_lq;
 // Non deadlocking
 
 // Factory to construct petrinet with configurable no of diners

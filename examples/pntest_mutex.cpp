@@ -1,5 +1,5 @@
 #include "petrinet.h"
-
+thread_local queue<Work> MTEngine::_lq;
 // https://people.cs.vt.edu/kafura/ComputationalThinking/Class-Notes/Petri-Net-Notes-Expanded.pdf
 // Fig 7
 
