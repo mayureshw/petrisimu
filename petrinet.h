@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <list>
+#include <set>
 #include "dot.h"
 #include "mtengine.h"
 
@@ -34,7 +35,7 @@ typedef vector<PNArc*> Arcs; // a vector to aid filtering by indices
 typedef list<PNPlace*> Places;
 typedef list<PNTransition*> Transitions;
 typedef list<PNNode*> Nodes;
-typedef list<PNElement*> Elements;
+typedef set<PNElement*> Elements;
 
 // Interfaces to resolve inter-dependencies
 class IPetriNet : public MTEngine
@@ -267,19 +268,21 @@ public:
     // For intermediate node (if any) optional argument 'name' can be passed
     static PNNode* createArc(PNNode *n1, PNNode *n2, Elements& pnes, string name = "")
     {
+        pnes.insert(n1);
+        pnes.insert(n2);
         if ( n1->typ() == PNElement::TRANSITION )
         {
             if ( n2->typ() == PNElement::TRANSITION )
             {
                 auto *dummy = new PNPlace(name);
-                pnes.push_back(dummy);
-                pnes.push_back(new PNTPArc((PNTransition*)n1,dummy));
-                pnes.push_back(new PNPTArc(dummy,(PNTransition*)n2));
+                pnes.insert(dummy);
+                pnes.insert(new PNTPArc((PNTransition*)n1,dummy));
+                pnes.insert(new PNPTArc(dummy,(PNTransition*)n2));
                 return dummy;
             }
             else
             {
-                pnes.push_back(new PNTPArc((PNTransition*)n1,(PNPlace*)n2));
+                pnes.insert(new PNTPArc((PNTransition*)n1,(PNPlace*)n2));
                 return NULL;
             }
         }
@@ -287,15 +290,15 @@ public:
         {
             if ( n2->typ() == PNElement::TRANSITION )
             {
-                pnes.push_back(new PNPTArc((PNPlace*)n1,(PNTransition*)n2));
+                pnes.insert(new PNPTArc((PNPlace*)n1,(PNTransition*)n2));
                 return NULL;
             }
             else
             {
                 auto *dummy = new PNTransition(name);
-                pnes.push_back(dummy);
-                pnes.push_back(new PNPTArc((PNPlace*)n1,dummy));
-                pnes.push_back(new PNTPArc(dummy,(PNPlace*)n2));
+                pnes.insert(dummy);
+                pnes.insert(new PNPTArc((PNPlace*)n1,dummy));
+                pnes.insert(new PNTPArc(dummy,(PNPlace*)n2));
                 return dummy;
             }
         }
