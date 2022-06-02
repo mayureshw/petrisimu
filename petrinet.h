@@ -303,6 +303,36 @@ public:
             }
         }
     }
+    // Not a json, but json like data structure readable in python (we use
+    // tuples, are not bothered about the trailing comma, can use single quoted
+    // strings etc.
+    void printjson(string filename="petri.json")
+    {
+        ofstream ofs;
+        ofs.open(filename);
+        ofs << "{" << endl;
+
+        ofs << "'places' : [" << endl;
+        for(auto p:_places)
+        {
+            ofs << "(" << p->idstr() << ",'" << p->_name << "',[";
+            for(auto a:p->_oarcs) ofs << a->_transition->idstr() << ",";
+            ofs << "])," << endl;
+        }
+        ofs << "]," << endl;
+
+        ofs << "'transitions' : [" << endl;
+        for(auto t:_transitions)
+        {
+            ofs << "(" << t->idstr() << ",'" << t->_name << "',[";
+            for(auto a:t->_oarcs) ofs << a->_place->idstr() << ",";
+            ofs << "])," << endl;
+        }
+        ofs << "]," << endl;
+
+        ofs << "}" << endl;
+        ofs.close();
+    }
     void printdot(string filename="petri.dot")
     {
         DNodeList nl;
