@@ -1,27 +1,32 @@
 class PetriNet:
-    def slice(self,seeds,stopset,rel):
+    def slice(self,seeds,rel,stopset,excludeset):
         closure = seeds
         newnodes = seeds
         while True:
-            newnodes = { newn for n in newnodes if n not in stopset for newn in rel.get(n,[]) if newn not in closure }
+            newnodes = { newn for n in newnodes if n not in stopset for newn in rel.get(n,[]) if newn not in closure and newn not in excludeset }
             if len(newnodes) == 0 : break
             closure = closure.union(newnodes)
         return closure
 
-    def fwdslice(self,seeds,stopset=set()): return self.slice(seeds,stopset,self.succ)
+    def fwdslice(self,seeds,stopset=set(),excludeset=set()): return self.slice(seeds,self.succ,stopset,excludeset)
 
-    def bwdslice(self,seeds,stopset=set()): return self.slice(seeds,stopset,self.pred)
+    def bwdslice(self,seeds,stopset=set(),excludeset=set()): return self.slice(seeds,self.pred,stopset,excludeset)
 
-    def chop(self,fwdseeds,bwdseeds,fwdstopset=set(),bwdstopset=set()):
-        return self.bwdslice(bwdseeds,bwdstopset).intersection(self.fwdslice(fwdseeds,fwdstopset))
+    def chop(self,fwdseeds,bwdseeds,fwdstopset=set(),bwdstopset=set(),excludeset=set()):
+        return self.bwdslice(bwdseeds,bwdstopset.union(fwdseeds),excludeset).intersection(
+            self.fwdslice(fwdseeds,fwdstopset.union(bwdseeds),excludeset))
 
-    def printdot(self,nodes=None,flnm='slice.dot'):
+    def printdot(self,nodes=None,flnm='slice.dot',highlight=set()):
         slicenodes = nodes if nodes != None else self.nodes
         fp = open(flnm,'w')
         print('digraph {',file=fp)
         for n in slicenodes:
+            label='label="'+self.labels[n]+'"'
             shape = 'shape=rectangle' if n in self.transitions else ''
-            print(n, '[label=','"'+self.labels[n]+'"', ',',shape,']',file=fp)
+            style = 'style=filled' if n in highlight else ''
+            props = [shape, style, label]
+            propstr = '[' + ','.join(p for p in props if p != '') + ']'
+            print(n, propstr, file=fp)
             for s in self.succ.get(n,[]):
                 if s in slicenodes: print(n,'->',s,file=fp)
         print('}',file=fp)
