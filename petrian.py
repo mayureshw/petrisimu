@@ -1,4 +1,12 @@
 class PetriNet:
+    # seeds : set of seeds for transitive closure
+    # stopset : the walk would not traverse BEYOND these
+    # excludeset : the walk would not traverse TO these
+    # WARNING: This is just a graph reduction technique for ease of
+    # comprehension. This is not guaranteed to be semantics preserving (e.g.
+    # there may be multiple predecessor to a transition, some of which may be
+    # hidden due to excludeset etc.). Always correlate your understanding with
+    # the whole graph.
     def slice(self,seeds,rel,stopset,excludeset):
         closure = seeds
         newnodes = seeds
