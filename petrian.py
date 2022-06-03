@@ -22,7 +22,8 @@ class PetriNet:
         for n in slicenodes:
             shape = 'shape=rectangle' if n in self.transitions else ''
             print(n, '[label=','"'+self.labels[n]+'"', ',',shape,']',file=fp)
-            for s in self.succ.get(n,[]): print(n,'->',s,file=fp)
+            for s in self.succ.get(n,[]):
+                if s in slicenodes: print(n,'->',s,file=fp)
         print('}',file=fp)
 
     def __init__(self,flnm):
