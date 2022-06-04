@@ -24,19 +24,28 @@ class PetriNet:
         return self.bwdslice(bwdseeds,bwdstopset.union(fwdseeds),excludeset).intersection(
             self.fwdslice(fwdseeds,fwdstopset.union(bwdseeds),excludeset))
 
-    def printdot(self,nodes=None,flnm='slice.dot',highlight=set()):
+    # TODO: Currently no way to identify marked places, need it in petri.json dumped
+    def trivialplace(self,p): return p in self.places and len(self.succ.get(p,[])) == 1 and len(self.pred.get(p,[])) == 1
+
+    def successors(self,n,skiptrivial=True):
+        succs = self.succ.get(n,[])
+        return succs if n in self.places or not skiptrivial else [
+            ( self.succ[p][0] if self.trivialplace(p) else p ) for p in succs ]
+
+    def printdot(self,nodes=None,flnm='slice.dot',highlight=set(),skiptrivial=True):
         slicenodes = nodes if nodes != None else self.nodes
+        skippednodes = { n for n in slicenodes if not self.trivialplace(n) } if skiptrivial else slicenodes
         fp = open(flnm,'w')
         print('digraph {',file=fp)
-        for n in slicenodes:
-            label='label="'+self.labels[n]+'"'
+        for n in skippednodes:
+            label='label="'+str(n)+':'+self.labels[n]+'"'
             shape = 'shape=rectangle' if n in self.transitions else ''
             style = 'style=filled' if n in highlight else ''
             props = [shape, style, label]
             propstr = '[' + ','.join(p for p in props if p != '') + ']'
             print(n, propstr, file=fp)
-            for s in self.succ.get(n,[]):
-                if s in slicenodes: print(n,'->',s,file=fp)
+            for s in self.successors(n,skiptrivial):
+                if s in skippednodes: print(n,'->',s,file=fp)
         print('}',file=fp)
 
     def __init__(self,flnm):
