@@ -28,7 +28,10 @@ class PetriNet:
 
     def trace(self,n,relf,stopset,excludeset,visited=set(),indent=1):
         newvisited = visited.union({n})
-        if n in stopset or n in visited: return newvisited
+        if n in stopset: return newvisited
+        if n in visited:
+            self.logtrace(str(n) + ': VISITED', [] , indent)
+            return newvisited
         preds = relf(n)
         quant = str(n) + ': ' + ( 'ANYOF' if self.isplace(n) else 'ALLOF' ) + '(' + str(len(preds)) + ')'
         self.logtrace(quant,preds,indent)
