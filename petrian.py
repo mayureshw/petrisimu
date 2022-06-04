@@ -27,10 +27,13 @@ class PetriNet:
     # TODO: Currently no way to identify marked places, need it in petri.json dumped
     def trivialplace(self,p): return p in self.places and len(self.succ.get(p,[])) == 1 and len(self.pred.get(p,[])) == 1
 
-    def successors(self,n,skiptrivial=True,retainset=set()):
-        succs = self.succ.get(n,[])
+    def neighbors(self,n,rel,skiptrivial,retainset):
+        succs = rel.get(n,[])
         return succs if n in self.places or not skiptrivial else [
-            ( self.succ[p][0] if self.trivialplace(p) and p not in retainset else p ) for p in succs ]
+            ( rel[p][0] if self.trivialplace(p) and p not in retainset else p ) for p in succs ]
+
+    def successors(self,n,skiptrivial=True,retainset=set()): return self.neighbors(n,self.succ,skiptrivial,retainset)
+    def predecessors(self,n,skiptrivial=True,retainset=set()): return self.neighbors(n,self.pred,skiptrivial,retainset)
 
     def printdot(self,nodes=None,flnm='slice.dot',highlight=set(),skiptrivial=True):
         slicenodes = nodes if nodes != None else self.nodes
