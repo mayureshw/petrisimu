@@ -387,11 +387,11 @@ class PNDbgPlace : public PNPlace
 public:
     void addactions()
     {
-        cout << "Place " << idlabel() << " got tokens, current tokens: " << _tokens << endl;
+        cout << "Place:" << idlabel() << ":added:remaining:" << _tokens << endl;
     }
     void deductactions()
     {
-        cout << "Place " << idlabel() << " consumed tokens, current tokens: " << _tokens << endl;
+        cout << "Place:" << idlabel() << ":deducted:remaining:" << _tokens << endl;
     }
     template <typename... Arg> PNDbgPlace(Arg... args) : PNPlace(args...) {}
 };
@@ -401,7 +401,7 @@ class PNDbgTransition : public PNTransition
 public:
     void enabledactions()
     {
-        cout << "Transition " << idlabel() << " enabled" << endl;
+        cout << "Transition:" << idlabel() << " enabled" << endl;
         _enabledactions();
     }
     template <typename... Arg> PNDbgTransition(Arg... args) : PNTransition(args...) {}
