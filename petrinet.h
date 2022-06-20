@@ -94,10 +94,11 @@ public:
 
 class PNPlace : public PNNode
 {
-    function<void()> _addactions = [](){};
     function<list<int>()> _arcchooser = NULL;
     unsigned _capacity;
     mutex _tokenmutex;
+protected:
+    function<void()> _addactions = [](){};
 public:
     // This can be put on queue by adding a wrapper that does addwork, for granularity reason it wasn't
     void addtokens(unsigned newtokens)
@@ -190,6 +191,7 @@ class PNTransition : public IPNTransition, public PNNode
     }
 protected:
     function<void()> _enabledactions = [](){};
+    virtual void notEnoughTokensActions() {}
 public:
     void setEnabledActions(function<void()> af) { _enabledactions = af; }
     virtual void enabledactions() { _enabledactions(); }
@@ -199,6 +201,7 @@ public:
         _enabledPlaceCntMutex.lock();
         _enabledPlaceCnt++;
         if(haveEnoughTokens()) _pn->addwork(_tryTriggerWork);
+        else notEnoughTokensActions();
         _enabledPlaceCntMutex.unlock();
     }
     void notEnoughTokens()
@@ -388,6 +391,7 @@ public:
     void addactions()
     {
         cout << "Place:" << idlabel() << ":added:remaining:" << _tokens << endl;
+        _addactions();
     }
     void deductactions()
     {
@@ -398,6 +402,11 @@ public:
 
 class PNDbgTransition : public PNTransition
 {
+protected:
+    void notEnoughTokensActions()
+    {
+        cout << "Not enough tokens to trigger " << idlabel() << endl;
+    }
 public:
     void enabledactions()
     {
