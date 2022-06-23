@@ -55,14 +55,15 @@ class PetriNet:
     def trivialplace(self,p): return self.isplace(p) and len(self.succ.get(p,[])) == 1 and len(self.pred.get(p,[])) == 1
     def trivialnode(self,n): return len(self.succ.get(n,[])) == 1 and len(self.pred.get(n,[])) == 1
 
-    def deemedtrivial(self,n,forcedtrivial): return n in forcedtrivial or self.trivialnode(n)
-
-    def ntneighbor(self,n,rel,retainset,forcedtrivial): return n if n in retainset or not self.deemedtrivial(n,forcedtrivial) else self.ntneighbor(rel[n][0],rel,retainset,forcedtrivial)
+    def ntneighbors(self,n,rel,retainset,forcedtrivial):
+        return {n} if n in retainset else \
+        self.neighbors(n,rel,True,retainset,forcedtrivial) if n in forcedtrivial or self.trivialnode(n) else \
+        {n}
 
     def neighbors(self,n,rel,skiptrivial,retainset,forcedtrivial):
-        succs = rel.get(n,[])
-        return succs if not skiptrivial else [
-            self.ntneighbor(s,rel,retainset,forcedtrivial) for s in succs ]
+        succs = set(rel.get(n,[]))
+        return succs if not skiptrivial else { ntn
+             for s in succs for ntn in self.ntneighbors(s,rel,retainset,forcedtrivial) }
 
     def successors(self,n,skiptrivial=True,retainset=set(),forcedtrivial=set()): return self.neighbors(n,self.succ,skiptrivial,retainset,forcedtrivial)
     def predecessors(self,n,skiptrivial=True,retainset=set(),forcedtrivial=set()): return self.neighbors(n,self.pred,skiptrivial,retainset,forcedtrivial)
