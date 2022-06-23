@@ -24,28 +24,27 @@ class PetriNet:
         return self.bwdslice(bwdseeds,bwdstopset.union(fwdseeds),excludeset).intersection(
             self.fwdslice(fwdseeds,fwdstopset.union(bwdseeds),excludeset))
 
-    def logtrace(self,quant,ns,indent): print('\t'*indent + quant, ' '.join(self.tracelabel(n) for n in ns) )
+    def logtrace(self,quant,ns,indent,nlabel): print('\t'*indent + quant, ' '.join(self.tracelabel(n) for n in ns),nlabel)
 
-    def trace(self,n,relf,stopset,excludeset,visited=set(),indent=1):
+    def trace(self,n,relf,stopset,excludeset,visited=set(),indent=0):
         newvisited = visited.union({n})
         if n in stopset: return newvisited
+        nlabel = self.labels[n]
         if n in visited:
-            self.logtrace(str(n) + ': VISITED', [] , indent)
+            self.logtrace(str(n) + ': VISITED', [] , indent,nlabel)
             return newvisited
         preds = relf(n)
         quant = str(n) + ': ' + ( 'ANYOF' if self.isplace(n) else 'ALLOF' ) + '(' + str(len(preds)) + ')'
-        self.logtrace(quant,preds,indent)
+        self.logtrace(quant,preds,indent,nlabel)
         for p in preds:
             newvisited = newvisited.union (
                 self.trace(p,relf,stopset,excludeset,newvisited,indent+1) )
         return newvisited
 
     def tracebwd(self,seed,stopset=set(),excludeset=set(),skiptrivial=True,retainset=set()):
-        self.logtrace('SEED',[seed],0)
         self.trace(seed,lambda n:self.predecessors(n,skiptrivial,retainset),stopset,excludeset)
 
     def tracefwd(self,seed,stopset=set(),excludeset=set(),skiptrivial=True,retainset=set()):
-        self.logtrace('SEED',[seed],0)
         self.trace(seed,lambda n:self.successors(n,skiptrivial,retainset),stopset,excludeset)
 
     def isplace(self,p): return p in self.places
@@ -54,11 +53,14 @@ class PetriNet:
 
     # TODO: Currently no way to identify marked places, need it in petri.json dumped
     def trivialplace(self,p): return self.isplace(p) and len(self.succ.get(p,[])) == 1 and len(self.pred.get(p,[])) == 1
+    def trivialnode(self,n): return len(self.succ.get(n,[])) == 1 and len(self.pred.get(n,[])) == 1
+
+    def ntneighbor(self,n,rel,retainset): return n if not self.trivialnode(n) or n in retainset else self.ntneighbor(rel[n][0],rel,retainset)
 
     def neighbors(self,n,rel,skiptrivial,retainset):
         succs = rel.get(n,[])
-        return succs if self.isplace(n) or not skiptrivial else [
-            ( rel[p][0] if self.trivialplace(p) and p not in retainset else p ) for p in succs ]
+        return succs if not skiptrivial else [
+            self.ntneighbor(s,rel,retainset) for s in succs ]
 
     def successors(self,n,skiptrivial=True,retainset=set()): return self.neighbors(n,self.succ,skiptrivial,retainset)
     def predecessors(self,n,skiptrivial=True,retainset=set()): return self.neighbors(n,self.pred,skiptrivial,retainset)
@@ -67,7 +69,7 @@ class PetriNet:
     def tracelabel(self,n): return ( 'p' if self.isplace(n) else 't' ) + ':' + str(n)
     def printdot(self,nodes=None,flnm='slice.dot',highlight=set(),skiptrivial=True):
         slicenodes = nodes if nodes != None else self.nodes
-        skippednodes = { n for n in slicenodes if not self.trivialplace(n) or n in highlight } if skiptrivial else slicenodes
+        skippednodes = { n for n in slicenodes if not self.trivialnode(n) or n in highlight } if skiptrivial else slicenodes
         fp = open(flnm,'w')
         print('digraph {',file=fp)
         for n in skippednodes:
