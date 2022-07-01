@@ -1,3 +1,5 @@
+import re
+
 class PetriNet:
     # seeds : set of seeds for transitive closure
     # stopset : the walk would not traverse BEYOND these
@@ -11,7 +13,8 @@ class PetriNet:
         closure = seeds
         newnodes = seeds
         while True:
-            newnodes = { newn for n in newnodes if n not in stopset for newn in rel.get(n,[]) if newn not in closure and newn not in excludeset }
+            newnodes = { newn for n in newnodes if n not in stopset
+                for newn in rel.get(n,[]) if newn not in closure and newn not in excludeset }
             if len(newnodes) == 0 : break
             closure = closure.union(newnodes)
         return closure
@@ -31,10 +34,10 @@ class PetriNet:
         if n in stopset: return newvisited
         nlabel = self.labels[n]
         if n in visited:
-            self.logtrace(str(n) + ': VISITED', [] , indent,nlabel)
+            self.logtrace(self.tracelabel(n) + ': VISITED', [] , indent,nlabel)
             return newvisited
         preds = relf(n)
-        quant = str(n) + ': ' + ( 'ANYOF' if self.isplace(n) else 'ALLOF' ) + '(' + str(len(preds)) + ')'
+        quant = self.tracelabel(n) + ': ' + ( 'ANYOF' if self.isplace(n) else 'ALLOF' ) + '(' + str(len(preds)) + ')'
         self.logtrace(quant,preds,indent,nlabel)
         for p in preds:
             newvisited = newvisited.union (
@@ -53,7 +56,8 @@ class PetriNet:
 
     # TODO: Currently no way to identify marked places, need it in petri.json dumped
     def trivialplace(self,p): return self.isplace(p) and len(self.succ.get(p,[])) == 1 and len(self.pred.get(p,[])) == 1
-    def trivialnode(self,n): return len(self.succ.get(n,[])) == 1 and len(self.pred.get(n,[])) == 1
+    # TODO: only places treated as trivial, but this may have to adjust if needed
+    def trivialnode(self,n): return self.isplace(n) and len(self.succ.get(n,[])) == 1 and len(self.pred.get(n,[])) == 1
 
     def ntneighbors(self,n,rel,retainset,forcedtrivial):
         return {n} if n in retainset else \
@@ -85,6 +89,9 @@ class PetriNet:
             for s in self.successors(n,skiptrivial,highlight):
                 if s in skippednodes: print(n,'->',s,file=fp)
         print('}',file=fp)
+
+    def nodesMatchingRE(self, regex): return { n
+        for n in self.nodes if re.match(regex, self.labels[n]) }
 
     def __init__(self,flnm):
         self.pn = eval( open(flnm).read() )
