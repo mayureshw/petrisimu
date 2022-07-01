@@ -93,6 +93,10 @@ class PetriNet:
     def nodesMatchingRE(self, regex): return { n
         for n in self.nodes if re.match(regex, self.labels[n]) }
 
+    def complement(self, nodeset): return { n
+        for n in self.nodes if n not in nodeset
+        }
+
     def __init__(self,flnm):
         self.pn = eval( open(flnm).read() )
         self.places = { pid for (pid,_,_) in self.pn['places'] }
