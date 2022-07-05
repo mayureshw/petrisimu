@@ -94,17 +94,43 @@ class PetriNet:
         for n in self.nodes if re.match(regex, self.labels[n]) }
 
     def complement(self, nodeset): return { n
-        for n in self.nodes if n not in nodeset
-        }
+        for n in self.nodes if n not in nodeset }
 
-    def __init__(self,flnm):
-        self.pn = eval( open(flnm).read() )
-        self.places = { pid for (pid,_,_) in self.pn['places'] }
-        self.transitions = { tid for (tid,_,_) in self.pn['transitions'] }
-        self.nodes = self.places.union(self.transitions)
-        self.labels = { id:lbl for (id,lbl,_) in self.pn['places'] + self.pn['transitions'] }
-        self.succ = { pid:succ for (pid,_,succ) in self.pn['places'] + self.pn['transitions'] }
+    def filtsuccessors(self,n,inset,visited=set(),computed={}):
+        if n in computed: return computed[n]
+        succ = set()
+        if n in visited : return succ
+        visited.add(n)
+        for s in self.succ[n]:
+            if s in inset: succ.add(s)
+            else: succ = succ.union(self.filtsuccessors(s,inset,visited,computed))
+        computed[n] = succ
+        return succ
+
+    def filter(self,inset):
+        pn = PetriNet()
+        pn.places = inset.intersection(self.places)
+        pn.transitions = inset.intersection(self.transitions)
+        pn.nodes = pn.places.union(pn.transitions)
+        pn.labels = { id:self.labels[id] for id in pn.nodes }
+        pn.succ = { id:self.filtsuccessors(id,inset) for id in inset }
+        pn.buildPreds()
+        return pn
+
+    def buildPreds(self):
         self.pred = {}
         for (pred,succs) in self.succ.items():
             for succ in succs:
-                self.pred[succ] = self.pred.get(succ,[]) + [pred]
+                self.pred[succ] = self.pred.get(succ,set()).union({pred})
+
+    def byFlnm(self,flnm):
+        pn = eval( open(flnm).read() )
+        self.places = { pid for (pid,_,_) in pn['places'] }
+        self.transitions = { tid for (tid,_,_) in pn['transitions'] }
+        self.nodes = self.places.union(self.transitions)
+        self.labels = { id:lbl for (id,lbl,_) in pn['places'] + pn['transitions'] }
+        self.succ = { pid:succ for (pid,_,succ) in pn['places'] + pn['transitions'] }
+        self.buildPreds()
+
+    def __init__(self,flnm=None):
+        if flnm: self.byFlnm(flnm)
