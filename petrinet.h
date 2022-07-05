@@ -159,6 +159,7 @@ public:
                 ((IPNTransition*)oarc->_transition)->notEnoughTokens();
     }
     DNode dnode() { return DNode(idstr(),(Proplist){{"label",_name}}); }
+    void init() { if ( _marking ) addtokens(_marking); }
     // capacity 0 means place can hold unlimited tokens
     PNPlace(string name,unsigned marking=0,unsigned capacity=0) : PNNode(name), _capacity(capacity), _marking(marking) {}
     virtual ~PNPlace() {}
@@ -361,6 +362,7 @@ public:
         for(auto e:_arcs) delete e;
     }
 
+    void init() { for(auto p:_places) p->init(); }
     PetriNet(Places places, Transitions transitions, Arcs arcs) :
         _places(places), _transitions(transitions), _arcs(arcs)
     {
