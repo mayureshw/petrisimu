@@ -338,8 +338,9 @@ public:
             ofs << "<name><text>" << t->_name << "</text></name>";
             ofs << "</transition>" << endl;
         }
+        unsigned tmparcid=0;
         for(auto e:_arcs)
-            ofs << "<arc source=\"" << e->source()->idstr() << "\" target=\"" << e->target()->idstr() << "\"/>" << endl;
+            ofs << "<arc id=\"" << tmparcid++ << "\" source=\"" << e->source()->idstr() << "\" target=\"" << e->target()->idstr() << "\"/>" << endl;
         ofs << "</pnml>" << endl;
         ofs.close();
     }
