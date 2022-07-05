@@ -95,12 +95,15 @@ public:
 class PNPlace : public PNNode
 {
     function<list<int>()> _arcchooser = NULL;
+    unsigned _marking;
     unsigned _capacity;
     mutex _tokenmutex;
 protected:
     function<void()> _addactions = [](){};
 public:
+    void setMarking(unsigned marking) { _marking = marking; }
     // This can be put on queue by adding a wrapper that does addwork, for granularity reason it wasn't
+    unsigned marking() { return _marking; }
     void addtokens(unsigned newtokens)
     {
         Arcs eligibleArcs;
@@ -157,7 +160,7 @@ public:
     }
     DNode dnode() { return DNode(idstr(),(Proplist){{"label",_name}}); }
     // capacity 0 means place can hold unlimited tokens
-    PNPlace(string name,unsigned capacity=0) : PNNode(name), _capacity(capacity) {}
+    PNPlace(string name,unsigned marking=0,unsigned capacity=0) : PNNode(name), _capacity(capacity), _marking(marking) {}
     virtual ~PNPlace() {}
 };
 
@@ -319,7 +322,7 @@ public:
         ofs << "'places' : [" << endl;
         for(auto p:_places)
         {
-            ofs << "(" << p->idstr() << ",'" << p->_name << "',[";
+            ofs << "(" << p->idstr() << ",'" << p->_name << "'," << p->marking() << ",[";
             for(auto a:p->_oarcs) ofs << a->_transition->idstr() << ",";
             ofs << "])," << endl;
         }
@@ -379,14 +382,15 @@ public:
 // When QuitPlace gets a token the simulation ends
 class PNQuitPlace : public PNPlace
 {
+using PNPlace::PNPlace;
 public:
     void addactions() { _pn->quit(); }
-    template <typename... Arg> PNQuitPlace(Arg... args) : PNPlace(args...) {}
 };
 
 // Dbg* classes for testing purposes with logging
 class PNDbgPlace : public PNPlace
 {
+using PNPlace::PNPlace;
 public:
     void addactions()
     {
@@ -397,7 +401,6 @@ public:
     {
         cout << "Place:" << idlabel() << ":deducted:remaining:" << _tokens << endl;
     }
-    template <typename... Arg> PNDbgPlace(Arg... args) : PNPlace(args...) {}
 };
 
 class PNDbgTransition : public PNTransition
