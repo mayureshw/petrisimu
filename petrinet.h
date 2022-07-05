@@ -66,6 +66,8 @@ public:
     PNPlace* _place;
     PNTransition* _transition;
     unsigned _wt;
+    virtual PNNode* source()=0;
+    virtual PNNode* target()=0;
     virtual DEdge dedge() = 0;
     Etyp typ() { return ARC; }
     PNArc(PNPlace* p, PNTransition* t, unsigned wt) : _place(p), _transition(t), _wt(wt) {}
@@ -237,6 +239,8 @@ public:
 class PNPTArc : public PNArc
 {
 public:
+    PNNode* source() { return _place; }
+    PNNode* target() { return _transition; }
     DEdge dedge() { return DEdge(_place->idstr(),_transition->idstr()); }
     PNPTArc(PNPlace* p, PNTransition* t, unsigned wt=1) : PNArc(p,t,wt)
     {
@@ -248,6 +252,8 @@ public:
 class PNTPArc : public PNArc
 {
 public:
+    PNNode* source() { return _transition; }
+    PNNode* target() { return _place; }
     DEdge dedge() { return DEdge(_transition->idstr(),_place->idstr()); }
     PNTPArc(PNTransition* t, PNPlace* p, unsigned wt=1) : PNArc(p,t,wt)
     {
@@ -310,6 +316,32 @@ public:
                 return dummy;
             }
         }
+    }
+    void printpnml(string filename="petri.pnml")
+    {
+        ofstream ofs;
+        ofs.open(filename);
+        ofs << "<?xml version=\"1.0\"?>" << endl;
+        ofs << "<pnml xmlns=\"http://www.pnml.org/version-2009/grammar/pnml\">" << endl;
+        for(auto p:_places)
+        {
+            ofs << "<place id=" << p->idstr() << ">";
+            ofs << "<name><text>" << p->_name << "</name></text>";
+            auto marking = p->marking();
+            if( marking )
+                ofs << "<initialMarking><text>" << marking << "</text></initialMarking>";
+            ofs << "</place>" << endl;
+        }
+        for(auto t:_transitions)
+        {
+            ofs << "<transition id=" << t->idstr() << ">";
+            ofs << "<name><text>" << t->_name << "</name></text>";
+            ofs << "</transition>" << endl;
+        }
+        for(auto e:_arcs)
+            ofs << "<arc source=" << e->source()->idstr() << " target=" << e->target()->idstr() << "/>" << endl;
+        ofs << "</pnml>" << endl;
+        ofs.close();
     }
     // Not a json, but json like data structure readable in python (we use
     // tuples, are not bothered about the trailing comma, can use single quoted
