@@ -325,8 +325,8 @@ public:
         ofs << "<pnml xmlns=\"http://www.pnml.org/version-2009/grammar/pnml\">" << endl;
         for(auto p:_places)
         {
-            ofs << "<place id=" << p->idstr() << ">";
-            ofs << "<name><text>" << p->_name << "</name></text>";
+            ofs << "<place id=\"" << p->idstr() << "\">";
+            ofs << "<name><text>" << p->_name << "</text></name>";
             auto marking = p->marking();
             if( marking )
                 ofs << "<initialMarking><text>" << marking << "</text></initialMarking>";
@@ -334,12 +334,12 @@ public:
         }
         for(auto t:_transitions)
         {
-            ofs << "<transition id=" << t->idstr() << ">";
-            ofs << "<name><text>" << t->_name << "</name></text>";
+            ofs << "<transition id=\"" << t->idstr() << "\">";
+            ofs << "<name><text>" << t->_name << "</text></name>";
             ofs << "</transition>" << endl;
         }
         for(auto e:_arcs)
-            ofs << "<arc source=" << e->source()->idstr() << " target=" << e->target()->idstr() << "/>" << endl;
+            ofs << "<arc source=\"" << e->source()->idstr() << "\" target=\"" << e->target()->idstr() << "\"/>" << endl;
         ofs << "</pnml>" << endl;
         ofs.close();
     }
