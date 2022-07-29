@@ -44,11 +44,17 @@ class PetriNet:
                 self.trace(p,relf,stopset,excludeset,newvisited,indent+1) )
         return newvisited
 
-    def tracebwd(self,seed,stopset=set(),excludeset=set(),skiptrivial=True,retainset=set(),forcedtrivial=set()):
-        self.trace(seed,lambda n:self.predecessors(n,skiptrivial,retainset,forcedtrivial),stopset,excludeset)
+    def tracebwd(self,seeds,stopset=set(),excludeset=set(),skiptrivial=True,retainset=set(),forcedtrivial=set()):
+        allseeds = set(seeds)
+        for seed in seeds:
+            otherseeds = allseeds - {seed}
+            self.trace(seed,lambda n:self.predecessors(n,skiptrivial,retainset,forcedtrivial),stopset,excludeset,otherseeds)
 
-    def tracefwd(self,seed,stopset=set(),excludeset=set(),skiptrivial=True,retainset=set(),forcedtrivial=set()):
-        self.trace(seed,lambda n:self.successors(n,skiptrivial,retainset,forcedtrivial),stopset,excludeset)
+    def tracefwd(self,seeds,stopset=set(),excludeset=set(),skiptrivial=True,retainset=set(),forcedtrivial=set()):
+        allseeds = set(seeds)
+        for seed in seeds:
+            otherseeds = allseeds - {seed}
+            self.trace(seed,lambda n:self.successors(n,skiptrivial,retainset,forcedtrivial),stopset,excludeset,otherseeds)
 
     def isplace(self,p): return p in self.places
 
@@ -125,11 +131,11 @@ class PetriNet:
 
     def byFlnm(self,flnm):
         pn = eval( open(flnm).read() )
-        self.places = { pid for (pid,_,_) in pn['places'] }
+        self.places = { pid for (pid,_,_,_) in pn['places'] }
         self.transitions = { tid for (tid,_,_) in pn['transitions'] }
         self.nodes = self.places.union(self.transitions)
-        self.labels = { id:lbl for (id,lbl,_) in pn['places'] + pn['transitions'] }
-        self.succ = { pid:succ for (pid,_,succ) in pn['places'] + pn['transitions'] }
+        self.labels = { p_or_t[0]:p_or_t[1] for p_or_t in pn['places'] + pn['transitions'] }
+        self.succ = { p_or_t[0]:p_or_t[-1] for p_or_t in pn['places'] + pn['transitions'] }
         self.buildPreds()
 
     def __init__(self,flnm=None):
