@@ -160,7 +160,7 @@ public:
             if( _tokens < oarc->_wt && oldcnt >= oarc->_wt )
                 ((IPNTransition*)oarc->_transition)->notEnoughTokens();
     }
-    DNode dnode() { return DNode(idstr(),(Proplist){{"label",_name}}); }
+    DNode dnode() { return DNode(idstr(),(Proplist){{"label","p:"+idlabel()}}); }
     void init() { if ( _marking ) addtokens(_marking); }
     // capacity 0 means place can hold unlimited tokens
     PNPlace(string name,unsigned marking=0,unsigned capacity=0) : PNNode(name), _capacity(capacity), _marking(marking) {}
@@ -216,7 +216,7 @@ public:
         if( _enabledPlaceCnt > 0 ) _enabledPlaceCnt--;
         _enabledPlaceCntMutex.unlock();
     }
-    DNode dnode() { return DNode(idstr(),(Proplist){{"shape","rectangle"},{"label",_name}}); }
+    DNode dnode() { return DNode(idstr(),(Proplist){{"shape","rectangle"},{"label","t:"+idlabel()}}); }
     // Although tryTrigger is called only when preceding places have enough
     // tokens, there can be other contenders for those tokens who may consume
     // them, hence we need to check again whether this transition can fire by
@@ -262,6 +262,47 @@ public:
     }
 };
 
+// When QuitPlace gets a token the simulation ends
+class PNQuitPlace : public PNPlace
+{
+using PNPlace::PNPlace;
+public:
+    void addactions() { _pn->quit(); }
+};
+
+// Dbg* classes for testing purposes with logging
+class PNDbgPlace : public PNPlace
+{
+using PNPlace::PNPlace;
+public:
+    void addactions()
+    {
+        cout << "Place:" << idlabel() << ":added:remaining:" << _tokens << endl;
+        _addactions();
+    }
+    void deductactions()
+    {
+        cout << "Place:" << idlabel() << ":deducted:remaining:" << _tokens << endl;
+    }
+};
+
+class PNDbgTransition : public PNTransition
+{
+protected:
+    void notEnoughTokensActions()
+    {
+        cout << "Not enough tokens to trigger " << idlabel() << endl;
+    }
+public:
+    void enabledactions()
+    {
+        cout << "Transition:" << idlabel() << " enabled" << endl;
+        _enabledactions();
+    }
+    template <typename... Arg> PNDbgTransition(Arg... args) : PNTransition(args...) {}
+};
+
+
 
 class PetriNet : public IPetriNet
 {
@@ -288,7 +329,7 @@ public:
         {
             if ( n2->typ() == PNElement::TRANSITION )
             {
-                auto *dummy = new PNPlace(name);
+                auto *dummy = new PNDbgPlace(name);
                 pnes.insert(dummy);
                 pnes.insert(new PNTPArc((PNTransition*)n1,dummy));
                 pnes.insert(new PNPTArc(dummy,(PNTransition*)n2));
@@ -384,6 +425,11 @@ public:
         DGraph g(nl,el);
         g.printdot(filename);
     }
+    void printMarkings()
+    {
+        for(auto p:_places) if ( p->_tokens )
+            cout << "MARKING:" << p->idlabel() << ":" << p->_tokens << endl;
+    }
 
     // Convenience API to find and delete all elements (places, transitions,
     // arcs). Responsibility to delete is with one who does new (all
@@ -413,45 +459,4 @@ public:
         setpn();
     }
 };
-
-// When QuitPlace gets a token the simulation ends
-class PNQuitPlace : public PNPlace
-{
-using PNPlace::PNPlace;
-public:
-    void addactions() { _pn->quit(); }
-};
-
-// Dbg* classes for testing purposes with logging
-class PNDbgPlace : public PNPlace
-{
-using PNPlace::PNPlace;
-public:
-    void addactions()
-    {
-        cout << "Place:" << idlabel() << ":added:remaining:" << _tokens << endl;
-        _addactions();
-    }
-    void deductactions()
-    {
-        cout << "Place:" << idlabel() << ":deducted:remaining:" << _tokens << endl;
-    }
-};
-
-class PNDbgTransition : public PNTransition
-{
-protected:
-    void notEnoughTokensActions()
-    {
-        cout << "Not enough tokens to trigger " << idlabel() << endl;
-    }
-public:
-    void enabledactions()
-    {
-        cout << "Transition:" << idlabel() << " enabled" << endl;
-        _enabledactions();
-    }
-    template <typename... Arg> PNDbgTransition(Arg... args) : PNTransition(args...) {}
-};
-
 #endif
