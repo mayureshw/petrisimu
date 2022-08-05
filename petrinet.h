@@ -8,6 +8,11 @@
 #include "dot.h"
 #include "mtengine.h"
 
+#ifdef PNDBG
+static ofstream pnlog("petri.log");
+static mutex pnlogmutex;
+#endif
+
 using namespace std;
 
 // NOTES (in E-R model terms):
@@ -130,14 +135,29 @@ public:
             if( _tokens >= oarc->_wt && oldcnt < oarc->_wt )
                 ((IPNTransition*)oarc->_transition)->gotEnoughTokens();
         unlock();
-        addactions();
+        addactions(newtokens);
     }
     unsigned _tokens = 0;
     Etyp typ() { return PLACE; }
     void setArcChooser(function<list<int>()> f) { _arcchooser = f; }
     void setAddActions(function<void()> af) { _addactions = af; }
-    virtual void addactions() { _addactions(); }
-    virtual void deductactions() {}
+    virtual void addactions(unsigned newtokens)
+    {
+#ifdef PNDBG
+        pnlogmutex.lock();
+        pnlog << "p:" << idstr() << ":+" << newtokens << ":" << _tokens << ":" << _name << endl;
+        pnlogmutex.unlock();
+#endif
+        _addactions();
+    }
+    virtual void deductactions(unsigned dedtokens)
+    {
+#ifdef PNDBG
+        pnlogmutex.lock();
+        pnlog << "p:" << idstr() << ":-" << dedtokens << ":" << _tokens << ":" << _name << endl;
+        pnlogmutex.unlock();
+#endif
+    }
     void lock() { _tokenmutex.lock(); }
     bool lockIfEnough(unsigned mintokens)
     {
@@ -197,10 +217,25 @@ class PNTransition : public IPNTransition, public PNNode
     }
 protected:
     function<void()> _enabledactions = [](){};
-    virtual void notEnoughTokensActions() {}
+    virtual void notEnoughTokensActions()
+    {
+#ifdef PNDBG
+        pnlogmutex.lock();
+        pnlog << "wait:" << idlabel() << endl;
+        pnlogmutex.unlock();
+#endif
+    }
 public:
     void setEnabledActions(function<void()> af) { _enabledactions = af; }
-    virtual void enabledactions() { _enabledactions(); }
+    virtual void enabledactions()
+    {
+#ifdef PNDBG
+        pnlogmutex.lock();
+        pnlog << "t:" << idlabel() << endl;
+        pnlogmutex.unlock();
+#endif
+        _enabledactions();
+    }
     Etyp typ() { return TRANSITION; }
     void gotEnoughTokens()
     {
@@ -227,7 +262,7 @@ public:
         while(haveEnoughTokens())
             if(tryTransferTokens(it))
             {
-                for(auto iarc:_iarcs) iarc->_place->deductactions();
+                for(auto iarc:_iarcs) iarc->_place->deductactions(iarc->_wt);
                 enabledactions();
                 for(auto oarc:_oarcs) oarc->_place->addtokens(oarc->_wt);
             }
@@ -267,42 +302,8 @@ class PNQuitPlace : public PNPlace
 {
 using PNPlace::PNPlace;
 public:
-    void addactions() { _pn->quit(); }
+    void addactions(unsigned) { _pn->quit(); }
 };
-
-// Dbg* classes for testing purposes with logging
-class PNDbgPlace : public PNPlace
-{
-using PNPlace::PNPlace;
-public:
-    void addactions()
-    {
-        cout << "Place:" << idlabel() << ":added:remaining:" << _tokens << endl;
-        _addactions();
-    }
-    void deductactions()
-    {
-        cout << "Place:" << idlabel() << ":deducted:remaining:" << _tokens << endl;
-    }
-};
-
-class PNDbgTransition : public PNTransition
-{
-protected:
-    void notEnoughTokensActions()
-    {
-        cout << "Not enough tokens to trigger " << idlabel() << endl;
-    }
-public:
-    void enabledactions()
-    {
-        cout << "Transition:" << idlabel() << " enabled" << endl;
-        _enabledactions();
-    }
-    template <typename... Arg> PNDbgTransition(Arg... args) : PNTransition(args...) {}
-};
-
-
 
 class PetriNet : public IPetriNet
 {
@@ -329,7 +330,7 @@ public:
         {
             if ( n2->typ() == PNElement::TRANSITION )
             {
-                auto *dummy = new PNDbgPlace(name);
+                auto *dummy = new PNPlace(name);
                 pnes.insert(dummy);
                 pnes.insert(new PNTPArc((PNTransition*)n1,dummy));
                 pnes.insert(new PNPTArc(dummy,(PNTransition*)n2));
