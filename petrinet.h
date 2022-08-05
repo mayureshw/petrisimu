@@ -9,8 +9,14 @@
 #include "mtengine.h"
 
 #ifdef PNDBG
-static ofstream pnlog("petri.log");
-static mutex pnlogmutex;
+    static ofstream pnlog("petri.log");
+    static mutex pnlogmutex;
+#   define PNLOG(ARGS) \
+    pnlogmutex.lock(); \
+    pnlog << ARGS << endl; \
+    pnlogmutex.unlock();
+#else
+#   define PNLOG(ARGS)
 #endif
 
 using namespace std;
@@ -143,20 +149,12 @@ public:
     void setAddActions(function<void()> af) { _addactions = af; }
     virtual void addactions(unsigned newtokens)
     {
-#ifdef PNDBG
-        pnlogmutex.lock();
-        pnlog << "p:" << idstr() << ":+" << newtokens << ":" << _tokens << ":" << _name << endl;
-        pnlogmutex.unlock();
-#endif
+        PNLOG("p:" << idstr() << ":+" << newtokens << ":" << _tokens << ":" << _name)
         _addactions();
     }
     virtual void deductactions(unsigned dedtokens)
     {
-#ifdef PNDBG
-        pnlogmutex.lock();
-        pnlog << "p:" << idstr() << ":-" << dedtokens << ":" << _tokens << ":" << _name << endl;
-        pnlogmutex.unlock();
-#endif
+        PNLOG("p:" << idstr() << ":-" << dedtokens << ":" << _tokens << ":" << _name)
     }
     void lock() { _tokenmutex.lock(); }
     bool lockIfEnough(unsigned mintokens)
@@ -219,21 +217,13 @@ protected:
     function<void()> _enabledactions = [](){};
     virtual void notEnoughTokensActions()
     {
-#ifdef PNDBG
-        pnlogmutex.lock();
-        pnlog << "wait:" << idlabel() << endl;
-        pnlogmutex.unlock();
-#endif
+        PNLOG("wait:" << idlabel())
     }
 public:
     void setEnabledActions(function<void()> af) { _enabledactions = af; }
     virtual void enabledactions()
     {
-#ifdef PNDBG
-        pnlogmutex.lock();
-        pnlog << "t:" << idlabel() << endl;
-        pnlogmutex.unlock();
-#endif
+        PNLOG("t:" << idlabel())
         _enabledactions();
     }
     Etyp typ() { return TRANSITION; }
