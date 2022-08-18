@@ -53,7 +53,7 @@ class IPetriNet : public MTEngine
 {
     int _idcntr = 0;
 public:
-    int getIncId() { return _idcntr++; }
+    unsigned getIncId() { return _idcntr++; }
 };
 
 class IPNTransition
@@ -87,7 +87,7 @@ public:
 
 class PNNode : public PNElement
 {
-    int _nodeid;
+    unsigned _nodeid;
 public:
     IPetriNet* _pn;
     Arcs _iarcs;
