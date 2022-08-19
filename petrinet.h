@@ -87,8 +87,8 @@ public:
 
 class PNNode : public PNElement
 {
-    unsigned _nodeid;
 public:
+    unsigned _nodeid;
     IPetriNet* _pn;
     Arcs _iarcs;
     Arcs _oarcs;
