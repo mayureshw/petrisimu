@@ -51,9 +51,8 @@ typedef set<PNElement*> Elements;
 // Interfaces to resolve inter-dependencies
 class IPetriNet : public MTEngine
 {
-    int _idcntr = 0;
 public:
-    unsigned getIncId() { return _idcntr++; }
+    static unsigned _idcntr;
 };
 
 class IPNTransition
@@ -88,21 +87,17 @@ public:
 class PNNode : public PNElement
 {
 public:
-    unsigned _nodeid;
+    const unsigned _nodeid;
     IPetriNet* _pn;
     Arcs _iarcs;
     Arcs _oarcs;
     const string _name;
-    void setpn(IPetriNet* pn)
-    {
-        _pn = pn;
-        _nodeid = _pn->getIncId();
-    }
+    void setpn(IPetriNet* pn) { _pn = pn; }
     void addiarc(PNArc* a) { _iarcs.push_back(a); }
     void addoarc(PNArc* a) { _oarcs.push_back(a); }
     string idlabel() { return idstr() + ":" + _name; }
     string idstr() { return to_string(_nodeid); }
-    PNNode(string name) : _name(name) {}
+    PNNode(string name) : _name(name), _nodeid(IPetriNet::_idcntr++) {}
 };
 
 class PNPlace : public PNNode
