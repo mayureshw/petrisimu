@@ -53,6 +53,9 @@ class IPetriNet : public MTEngine
 {
 public:
     static unsigned _idcntr;
+    function<void(unsigned)> _eventListener;
+    void tellListener(unsigned e) { _eventListener(e); }
+    IPetriNet(function<void(unsigned)> eventListener) : _eventListener(eventListener) {}
 };
 
 class IPNTransition
@@ -218,6 +221,9 @@ public:
     void setEnabledActions(function<void()> af) { _enabledactions = af; }
     virtual void enabledactions()
     {
+#       ifdef PN_USE_EVENT_LISTENER
+        _pn->tellListener(_nodeid);
+#       endif
         PNLOG("t:" << idlabel())
         _enabledactions();
     }
@@ -428,12 +434,8 @@ public:
     }
 
     void init() { for(auto p:_places) p->init(); }
-    PetriNet(Places places, Transitions transitions, Arcs arcs) :
-        _places(places), _transitions(transitions), _arcs(arcs)
-    {
-        setpn();
-    }
-    PetriNet(Elements elements)
+    PetriNet(Elements elements, function<void(unsigned)> eventListener = [](unsigned){})
+        : IPetriNet(eventListener)
     {
         for(auto e:elements)
             switch(e->typ())
