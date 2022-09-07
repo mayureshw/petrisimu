@@ -27,6 +27,7 @@ int main()
 
     PetriNet pn({p1,p2,p3,p4,pq},{t1,t2,t3},{a1,a2,a3,a4,a5,a6,a7,a8,a9});
     pn.printdot();
+    pn.printpnml();
     p1->addtokens(1);
     p2->addtokens(1);
     // The net may or may not deadlock in different runs as the behavior is non
