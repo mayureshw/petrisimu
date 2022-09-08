@@ -2,5 +2,6 @@ ifndef _PETRISIMU_
 _PETRISIMU_ = 1
 
 CXXFLAGS	+=	-I$(PETRISIMUDIR)
+LDFLAGS		+=	-lpthread
 
 endif
