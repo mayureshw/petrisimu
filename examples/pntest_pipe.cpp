@@ -1,20 +1,23 @@
+using namespace std;
+
 #include "petrinet.h"
-thread_local queue<Work> MTEngine::_lq;
+PETRINET_STATICS
+
 int main()
 {
     auto
-        *mutex = new PNDbgPlace("mutex"),
-        *free = new PNDbgPlace("free"),
-        *filled = new PNDbgPlace("filled"),
-        *push1P = new PNDbgPlace("push1P"),
-        *push2P = new PNDbgPlace("push2P"),
-        *pop1P = new PNDbgPlace("pop1P"),
-        *pop2P = new PNDbgPlace("pop2P");
+        *mutex = new PNPlace("mutex"),
+        *free = new PNPlace("free"),
+        *filled = new PNPlace("filled"),
+        *push1P = new PNPlace("push1P"),
+        *push2P = new PNPlace("push2P"),
+        *pop1P = new PNPlace("pop1P"),
+        *pop2P = new PNPlace("pop2P");
     auto
-        *push1 = new PNDbgTransition("PushReq1"),
-        *push2 = new PNDbgTransition("PushReq2"),
-        *pop1 = new PNDbgTransition("PopReq1"),
-        *pop2 = new PNDbgTransition("PopReq2");
+        *push1 = new PNTransition("PushReq1"),
+        *push2 = new PNTransition("PushReq2"),
+        *pop1 = new PNTransition("PopReq1"),
+        *pop2 = new PNTransition("PopReq2");
     auto
         *a1 = new PNPTArc(mutex,push1),
         *a2 = new PNPTArc(mutex,push2),
@@ -39,9 +42,9 @@ int main()
         *a20 = new PNTPArc(push2,filled);
 
     PetriNet pn(
-        {mutex,free,filled,push1P,push2P,pop1P,pop2P},
-        {push1,push2,pop1,pop2},
-        {a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12,a13,a14,a15,a16,a17,a18,a19,a20}
+        {mutex,free,filled,push1P,push2P,pop1P,pop2P,
+        push1,push2,pop1,pop2,
+        a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12,a13,a14,a15,a16,a17,a18,a19,a20}
         );
     pn.printdot();
     free->addtokens(3);

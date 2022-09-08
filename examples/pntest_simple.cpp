@@ -1,5 +1,8 @@
+using namespace std;
+
 #include "petrinet.h"
-thread_local queue<Work> MTEngine::_lq;
+PETRINET_STATICS
+
 int main()
 {
     PNPlace

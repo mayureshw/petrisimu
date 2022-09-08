@@ -1,35 +1,39 @@
+using namespace std;
+
 #include "petrinet.h"
-thread_local queue<Work> MTEngine::_lq;
+PETRINET_STATICS
+
 // https://people.cs.vt.edu/kafura/ComputationalThinking/Class-Notes/Petri-Net-Notes-Expanded.pdf
 // Fig 7
 
 int main()
 {
     auto
-        *at1 = new PNDbgPlace("at1"),
-        *use1 = new PNDbgPlace("use1"),
-        *done1 = new PNDbgPlace("done1"),
-        *drive1 = new PNDbgPlace("drive1"),
+        *at1 = new PNPlace("at1"),
+        *use1 = new PNPlace("use1"),
+        *done1 = new PNPlace("done1"),
+        *drive1 = new PNPlace("drive1"),
     
-        *at2 = new PNDbgPlace("at2"),
-        *use2 = new PNDbgPlace("use2"),
-        *done2 = new PNDbgPlace("done2"),
-        *drive2 = new PNDbgPlace("drive2"),
+        *at2 = new PNPlace("at2"),
+        *use2 = new PNPlace("use2"),
+        *done2 = new PNPlace("done2"),
+        *drive2 = new PNPlace("drive2"),
 
-        *mutex = new PNDbgPlace("mutex");
+        *mutex = new PNPlace("mutex");
 
     auto
-        *toat1 = new PNDbgTransition("toat1"),
-        *touse1 = new PNDbgTransition("touse1"),
-        *todone1 = new PNDbgTransition("todone1"),
-        *todrive1 = new PNDbgTransition("todrive1"),
+        *toat1 = new PNTransition("toat1"),
+        *touse1 = new PNTransition("touse1"),
+        *todone1 = new PNTransition("todone1"),
+        *todrive1 = new PNTransition("todrive1"),
 
-        *toat2 = new PNDbgTransition("toat2"),
-        *touse2 = new PNDbgTransition("touse2"),
-        *todone2 = new PNDbgTransition("todone2"),
-        *todrive2 = new PNDbgTransition("todrive2");
+        *toat2 = new PNTransition("toat2"),
+        *touse2 = new PNTransition("touse2"),
+        *todone2 = new PNTransition("todone2"),
+        *todrive2 = new PNTransition("todrive2");
 
-    Arcs arcs = {
+    Elements pnes = {
+        at1,use1,done1,drive1,mutex,at2,use2,done2,drive2,toat1,touse1,todone1,todrive1,toat2,touse2,todone2,todrive2,
         new PNPTArc(at1,touse1),
         new PNPTArc(use1,todone1),
         new PNPTArc(done1,todrive1),
@@ -54,7 +58,7 @@ int main()
         new PNTPArc(todone2,mutex),
         };
 
-    PetriNet pn({at1,use1,done1,drive1,mutex,at2,use2,done2,drive2},{toat1,touse1,todone1,todrive1,toat2,touse2,todone2,todrive2},arcs);
+    PetriNet pn(pnes);
     pn.printdot();
     mutex->addtokens(1);
     // Deliberately add 2 tokens, to test that transition doesn't deadlock if

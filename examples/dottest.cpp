@@ -1,3 +1,5 @@
+using namespace std;
+
 #include "dot.h"
 
 int main()

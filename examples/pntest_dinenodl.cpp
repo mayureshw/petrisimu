@@ -1,7 +1,10 @@
+using namespace std;
+
 #include <string>
 #include <vector>
 #include "petrinet.h"
-thread_local queue<Work> MTEngine::_lq;
+PETRINET_STATICS
+
 // Non deadlocking
 
 // Factory to construct petrinet with configurable no of diners
@@ -10,17 +13,17 @@ class Diner
 {
 public:
     string _id;
-    PNDbgPlace
-        *eating = new PNDbgPlace("eating"+_id),
-        *thinking = new PNDbgPlace("thinking"+_id),
-        *free_fork = new PNDbgPlace("free_fork"+_id);
-    PNDbgTransition
-        *strt_eating = new PNDbgTransition("strt_eating"+_id),
-        *strt_thinking = new PNDbgTransition("strt_thinking"+_id);
-    list<PNDbgPlace*> places = {
+    PNPlace
+        *eating = new PNPlace("eating"+_id),
+        *thinking = new PNPlace("thinking"+_id),
+        *free_fork = new PNPlace("free_fork"+_id);
+    PNTransition
+        *strt_eating = new PNTransition("strt_eating"+_id),
+        *strt_thinking = new PNTransition("strt_thinking"+_id);
+    list<PNPlace*> places = {
         eating, thinking, free_fork
         };
-    list<PNDbgTransition*> transitions = {
+    list<PNTransition*> transitions = {
         strt_eating, strt_thinking
         };
     Arcs arcs = {
@@ -42,20 +45,18 @@ public:
     DinerFactory(int nDiners)
     {
         vector<Diner> diners;
-        list<PNPlace*> places;
-        list<PNTransition*> transitions;
-        Arcs arcs;
+        Elements pnes;
         for(int i;i<nDiners;i++) diners.push_back(Diner(i));
         for(int i;i<nDiners;i++)
         {
             Diner& prev = i ? diners[i-1] : diners[nDiners-1], cur = diners[i];
             prev.arcs.push_back(new PNPTArc(cur.free_fork,prev.strt_eating));
             prev.arcs.push_back(new PNTPArc(prev.strt_thinking,cur.free_fork));
-            for(auto p:prev.places) places.push_back(p);
-            for(auto t:prev.transitions) transitions.push_back(t);
-            for(auto a:prev.arcs) arcs.push_back(a);
+            for(auto p:prev.places) pnes.insert(p);
+            for(auto t:prev.transitions) pnes.insert(t);
+            for(auto a:prev.arcs) pnes.insert(a);
         }
-        pn = new PetriNet(places,transitions,arcs);
+        pn = new PetriNet(pnes);
         // Place tokens only after constituting full net
         for(auto d:diners)
         {
