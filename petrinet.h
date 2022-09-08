@@ -19,8 +19,6 @@
 #   define PNLOG(ARGS)
 #endif
 
-using namespace std;
-
 // NOTES (in E-R model terms):
 // Basic entities (class names have prefix PN):
 //  - Place and Transition - basic petri net concepts
@@ -447,4 +445,8 @@ public:
         setpn();
     }
 };
+
+// Use this macro in exactly 1 cpp file in the application
+#define PETRINET_STATICS thread_local queue<Work> MTEngine::_lq; unsigned IPetriNet::_idcntr = 0;
+
 #endif
