@@ -5,6 +5,9 @@
 #include <string>
 #include <list>
 #include <set>
+#ifdef USESEQNO
+#   include <atomic>
+#endif
 #include "dot.h"
 #include "mtengine.h"
 
@@ -51,6 +54,9 @@ class IPetriNet : public MTEngine
 {
 public:
     static unsigned _idcntr;
+#   ifdef USESEQNO
+    atomic<unsigned long> _eseqno = 0;
+#   endif
     function<void(unsigned)> _eventListener;
     void tellListener(unsigned e) { _eventListener(e); }
     IPetriNet(function<void(unsigned)> eventListener) : _eventListener(eventListener) {}
@@ -210,20 +216,24 @@ class PNTransition : public IPNTransition, public PNNode
         else return false;
     }
 protected:
-    function<void()> _enabledactions = [](){};
+    function<void(unsigned long)> _enabledactions = [](unsigned long){};
     virtual void notEnoughTokensActions()
     {
         PNLOG("wait:" << idlabel())
     }
 public:
-    void setEnabledActions(function<void()> af) { _enabledactions = af; }
-    virtual void enabledactions()
+    void setEnabledActions(function<void(unsigned long)> af) { _enabledactions = af; }
+    void enabledactions(unsigned long eseqno)
     {
+// the event is delivered to a listener first and then the actions attached, if any, are carried out
+// Usually it is expected that the listener is some event sequence analyzer (such as a CEP tool)
+// while actions may trigger state changes under the main system under simulation. This sequence ensures
+// that the state changes caused by this event happen only after the listener sees the event.
 #       ifdef PN_USE_EVENT_LISTENER
         _pn->tellListener(_nodeid);
 #       endif
-        PNLOG("t:" << idlabel())
-        _enabledactions();
+        PNLOG("t:" << eseqno << ":" << idlabel())
+        _enabledactions(eseqno);
     }
     Etyp typ() { return TRANSITION; }
     void gotEnoughTokens()
@@ -252,7 +262,11 @@ public:
             if(tryTransferTokens(it))
             {
                 for(auto iarc:_iarcs) iarc->_place->deductactions(iarc->_wt);
-                enabledactions();
+#               ifdef USESEQNO
+                enabledactions(_pn->_eseqno++);
+#               else
+                enabledactions(0);
+#               endif
                 for(auto oarc:_oarcs) oarc->_place->addtokens(oarc->_wt);
             }
     }
