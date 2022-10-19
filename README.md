@@ -23,6 +23,8 @@ A C++ based multithreaded petri net simulator
 
         NTHREADS    Number of CPU threads used, default 1, typically set it to number of available cores
 
+Note: The LQTHRESHOLD heuristic is temporarily switched off for some issues documented in mtengine.h
+
         LQTHRESHOLD Local queue size of a thread beyond which it throws work items on global queue. Default 2.
                     Setting higher value reduces thread contention as thread count grows.
 

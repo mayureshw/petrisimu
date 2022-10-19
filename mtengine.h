@@ -66,7 +66,13 @@ class MTEngine
 public:
     void addwork(Work& work)
     {
-        if ( _lq.size() > _lqthreshold )
+        // TODO: lqthreshold heuristic is temporarily removed 1. If there are
+        // threads that are not a part of the pool how will this heuristic
+        // behave, needs to be analyzed.
+        // 2. During wait 100% CPU usage is seen
+        // 3. Find a way to notify when item is added to lq
+        //if ( _lq.size() > _lqthreshold )
+        if ( true )
         {
             {
                 const lock_guard<mutex> lockq(_gq_mutex);
