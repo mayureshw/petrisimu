@@ -232,7 +232,7 @@ public:
 #       ifdef PN_USE_EVENT_LISTENER
         _pn->tellListener(_nodeid);
 #       endif
-        PNLOG("t:" << eseqno << ":" << idlabel())
+        PNLOG("t:" << idlabel() << ":" << eseqno)
         _enabledactions(eseqno);
     }
     Etyp typ() { return TRANSITION; }
