@@ -52,12 +52,12 @@ typedef set<PNElement*> Elements;
 // Interfaces to resolve inter-dependencies
 class IPetriNet : public MTEngine
 {
+    function<void(unsigned)> _eventListener;
 public:
     static unsigned _idcntr;
 #   ifdef USESEQNO
     atomic<unsigned long> _eseqno = 0;
 #   endif
-    function<void(unsigned)> _eventListener;
     void tellListener(unsigned e) { _eventListener(e); }
     IPetriNet(function<void(unsigned)> eventListener) : _eventListener(eventListener) {}
 };
@@ -93,9 +93,10 @@ public:
 
 class PNNode : public PNElement
 {
-public:
+protected:
     const unsigned _nodeid;
     IPetriNet* _pn;
+public:
     Arcs _iarcs;
     Arcs _oarcs;
     const string _name;
@@ -113,6 +114,11 @@ class PNPlace : public PNNode
     unsigned _marking;
     unsigned _capacity;
     mutex _tokenmutex;
+    virtual void addactions(unsigned newtokens)
+    {
+        PNLOG("p:" << idstr() << ":+" << newtokens << ":" << _tokens << ":" << _name)
+        _addactions();
+    }
 protected:
     function<void()> _addactions = [](){};
 public:
@@ -149,11 +155,6 @@ public:
     Etyp typ() { return PLACE; }
     void setArcChooser(function<list<int>()> f) { _arcchooser = f; }
     void setAddActions(function<void()> af) { _addactions = af; }
-    virtual void addactions(unsigned newtokens)
-    {
-        PNLOG("p:" << idstr() << ":+" << newtokens << ":" << _tokens << ":" << _name)
-        _addactions();
-    }
     virtual void deductactions(unsigned dedtokens)
     {
         PNLOG("p:" << idstr() << ":-" << dedtokens << ":" << _tokens << ":" << _name)
@@ -215,14 +216,11 @@ class PNTransition : public IPNTransition, public PNNode
         }
         else return false;
     }
-protected:
     function<void(unsigned long)> _enabledactions = [](unsigned long){};
     virtual void notEnoughTokensActions()
     {
         PNLOG("wait:" << idlabel())
     }
-public:
-    void setEnabledActions(function<void(unsigned long)> af) { _enabledactions = af; }
     void enabledactions(unsigned long eseqno)
     {
 // the event is delivered to a listener first and then the actions attached, if any, are carried out
@@ -235,22 +233,6 @@ public:
         PNLOG("t:" << idlabel() << ":" << eseqno)
         _enabledactions(eseqno);
     }
-    Etyp typ() { return TRANSITION; }
-    void gotEnoughTokens()
-    {
-        _enabledPlaceCntMutex.lock();
-        _enabledPlaceCnt++;
-        if(haveEnoughTokens()) _pn->addwork(_tryTriggerWork);
-        else notEnoughTokensActions();
-        _enabledPlaceCntMutex.unlock();
-    }
-    void notEnoughTokens()
-    {
-        _enabledPlaceCntMutex.lock();
-        if( _enabledPlaceCnt > 0 ) _enabledPlaceCnt--;
-        _enabledPlaceCntMutex.unlock();
-    }
-    DNode dnode() { return DNode(idstr(),(Proplist){{"shape","rectangle"},{"label","t:"+idlabel()}}); }
     // Although tryTrigger is called only when preceding places have enough
     // tokens, there can be other contenders for those tokens who may consume
     // them, hence we need to check again whether this transition can fire by
@@ -270,6 +252,24 @@ public:
                 for(auto oarc:_oarcs) oarc->_place->addtokens(oarc->_wt);
             }
     }
+public:
+    void setEnabledActions(function<void(unsigned long)> af) { _enabledactions = af; }
+    Etyp typ() { return TRANSITION; }
+    void gotEnoughTokens()
+    {
+        _enabledPlaceCntMutex.lock();
+        _enabledPlaceCnt++;
+        if(haveEnoughTokens()) _pn->addwork(_tryTriggerWork);
+        else notEnoughTokensActions();
+        _enabledPlaceCntMutex.unlock();
+    }
+    void notEnoughTokens()
+    {
+        _enabledPlaceCntMutex.lock();
+        if( _enabledPlaceCnt > 0 ) _enabledPlaceCnt--;
+        _enabledPlaceCntMutex.unlock();
+    }
+    DNode dnode() { return DNode(idstr(),(Proplist){{"shape","rectangle"},{"label","t:"+idlabel()}}); }
     PNTransition(string name): PNNode(name) {}
     virtual ~PNTransition() {}
 };
