@@ -22,32 +22,20 @@
 #   define PNLOG(ARGS)
 #endif
 
-// NOTES (in E-R model terms):
-// Basic entities (class names have prefix PN):
-//  - Place and Transition - basic petri net concepts
-//  - PTArc and TPArc are arcs from Place to Transition and reverse resp.
-// Inheritance:
-//  - Place and Transition are Node
-//  - PTArc and TPArc are Arc
-// Properties:
-//  - All Nodes have a name
-//  - Arcs have weight (default 1)
-//  - Places have capacity (default 0 i.e. unlimited)
-// Relations between objects:
-//  - There is a 2-way relation between PetriNet and each of Place, Transition, Arc
-//  - There is a 2-way relation between Node and Arc
-//    (input and output relation identified separately)
+// Design Note: Some methods that should ideally belong to PNPlace /
+// PNTransition are hosted in respective PetriNet impelementation, because
+// they are specific to respective Petri net algorithm. So the behavioral
+// aspects, no matter of Place / Transition are implemented in PN variants and
+// rest of the classes have only structural and aspects that are agnostic to
+// Petri net approach. This allows us to keep multiple Petri net
+// implementation options available.
 
 class PNArc;
 class PNPlace;
 class PNTransition;
-class PNNode;
-class PNElement;
 typedef vector<PNArc*> Arcs; // a vector to aid filtering by indices
-typedef list<PNPlace*> Places;
-typedef list<PNTransition*> Transitions;
-typedef list<PNNode*> Nodes;
-typedef set<PNElement*> Elements;
+typedef set<PNPlace*> Places;
+typedef set<PNTransition*> Transitions;
 
 // Interfaces to resolve inter-dependencies
 class IPetriNet : public MTEngine
@@ -61,14 +49,6 @@ public:
     void tellListener(unsigned e) { _eventListener(e); }
     IPetriNet(function<void(unsigned)> eventListener) : _eventListener(eventListener) {}
 };
-
-class IPNTransition
-{
-public:
-    virtual void gotEnoughTokens()=0;
-    virtual void notEnoughTokens()=0;
-};
-
 
 class PNElement
 {
@@ -94,18 +74,17 @@ public:
 class PNNode : public PNElement
 {
 protected:
-    const unsigned _nodeid;
     IPetriNet* _pn;
 public:
+    const unsigned _nodeid;
     Arcs _iarcs;
     Arcs _oarcs;
     const string _name;
-    void setpn(IPetriNet* pn) { _pn = pn; }
     void addiarc(PNArc* a) { _iarcs.push_back(a); }
     void addoarc(PNArc* a) { _oarcs.push_back(a); }
     string idlabel() { return idstr() + ":" + _name; }
     string idstr() { return to_string(_nodeid); }
-    PNNode(string name) : _name(name), _nodeid(IPetriNet::_idcntr++) {}
+    PNNode(string name, IPetriNet* pn) : _name(name), _nodeid(IPetriNet::_idcntr++), _pn(pn) {}
 };
 
 class PNPlace : public PNNode
@@ -125,32 +104,6 @@ public:
     void setMarking(unsigned marking) { _marking = marking; }
     // This can be put on queue by adding a wrapper that does addwork, for granularity reason it wasn't
     unsigned marking() { return _marking; }
-    void addtokens(unsigned newtokens)
-    {
-        Arcs eligibleArcs;
-        if ( _arcchooser != NULL )
-        {
-            list<int> arcindices = _arcchooser();
-            for(auto i:arcindices)
-                eligibleArcs.push_back(_oarcs[i]);
-        }
-        else
-            eligibleArcs = _oarcs;
-
-        lock();
-        unsigned oldcnt = _tokens;
-        _tokens += newtokens;
-        for(auto oarc:eligibleArcs)
-            // inform the transition only if we crossed the threshold now
-            // Think, whether we want to randomize the sequence of oarc for non
-            // determinism Of course, without it also the behavior is correct,
-            // since a deterministic sequence is a subset of possible non
-            // deterministic behaviors anyway.
-            if( _tokens >= oarc->_wt && oldcnt < oarc->_wt )
-                ((IPNTransition*)oarc->_transition)->gotEnoughTokens();
-        unlock();
-        addactions(newtokens);
-    }
     unsigned _tokens = 0;
     Etyp typ() { return PLACE; }
     void setArcChooser(function<list<int>()> f) { _arcchooser = f; }
@@ -171,52 +124,19 @@ public:
         }
     }
     void unlock() { _tokenmutex.unlock(); }
-    // deducttokens Expects caller to have taken care of locking
-    void deducttokens(unsigned deducttokens)
-    {
-        unsigned oldcnt = _tokens;
-        _tokens -= deducttokens;
-        for(auto oarc:_oarcs)
-            // inform the transition only if we went below the threshold now
-            if( _tokens < oarc->_wt && oldcnt >= oarc->_wt )
-                ((IPNTransition*)oarc->_transition)->notEnoughTokens();
-    }
     DNode dnode() { return DNode(idstr(),(Proplist){{"label","p:"+idlabel()}}); }
-    void init() { if ( _marking ) addtokens(_marking); }
     // capacity 0 means place can hold unlimited tokens
-    PNPlace(string name,unsigned marking=0,unsigned capacity=0) : PNNode(name), _capacity(capacity), _marking(marking) {}
+    PNPlace(string name, IPetriNet* pn, unsigned marking=0,unsigned capacity=0) : PNNode(name, pn), _capacity(capacity), _marking(marking) {}
     virtual ~PNPlace() {}
 };
 
-class PNTransition : public IPNTransition, public PNNode
+class PNTransition : public PNNode
 {
-    Work _tryTriggerWork = bind(&PNTransition::tryTrigger,this);
     unsigned _enabledPlaceCnt = 0;
     mutex _enabledPlaceCntMutex;
     bool haveEnoughTokens() { return _enabledPlaceCnt == _iarcs.size(); }
-    // Recursive walk helps keep it simple to avoid locking input places in
-    // case previous ones do not meet the criteria
-    bool tryTransferTokens(Arcs::iterator it)
-    {
-        if(it==_iarcs.end()) return true;
-        auto ptarc = *it;
-        if(ptarc->_place->lockIfEnough(ptarc->_wt))
-        {
-            if(tryTransferTokens(++it))
-            {
-                ptarc->_place->deducttokens(ptarc->_wt);
-                ptarc->_place->unlock();
-                return true;
-            }
-            else
-            {
-                ptarc->_place->unlock();
-                return false;
-            }
-        }
-        else return false;
-    }
     function<void(unsigned long)> _enabledactions = [](unsigned long){};
+    function<unsigned long()> _delayfn = [](){ return 0; };
     virtual void notEnoughTokensActions()
     {
         PNLOG("wait:" << idlabel())
@@ -237,40 +157,12 @@ class PNTransition : public IPNTransition, public PNNode
     // tokens, there can be other contenders for those tokens who may consume
     // them, hence we need to check again whether this transition can fire by
     // holding all predecessor places' counts under a lock
-    void tryTrigger()
-    {
-        Arcs::iterator it = _iarcs.begin();
-        while(haveEnoughTokens())
-            if(tryTransferTokens(it))
-            {
-                for(auto iarc:_iarcs) iarc->_place->deductactions(iarc->_wt);
-#               ifdef USESEQNO
-                enabledactions(_pn->_eseqno++);
-#               else
-                enabledactions(0);
-#               endif
-                for(auto oarc:_oarcs) oarc->_place->addtokens(oarc->_wt);
-            }
-    }
 public:
     void setEnabledActions(function<void(unsigned long)> af) { _enabledactions = af; }
+    void setDelayFn( function<unsigned long()> df ) { _delayfn = df; }
     Etyp typ() { return TRANSITION; }
-    void gotEnoughTokens()
-    {
-        _enabledPlaceCntMutex.lock();
-        _enabledPlaceCnt++;
-        if(haveEnoughTokens()) _pn->addwork(_tryTriggerWork);
-        else notEnoughTokensActions();
-        _enabledPlaceCntMutex.unlock();
-    }
-    void notEnoughTokens()
-    {
-        _enabledPlaceCntMutex.lock();
-        if( _enabledPlaceCnt > 0 ) _enabledPlaceCnt--;
-        _enabledPlaceCntMutex.unlock();
-    }
     DNode dnode() { return DNode(idstr(),(Proplist){{"shape","rectangle"},{"label","t:"+idlabel()}}); }
-    PNTransition(string name): PNNode(name) {}
+    PNTransition(string name, IPetriNet *pn): PNNode(name), _pn(pn) {}
     virtual ~PNTransition() {}
 };
 
@@ -308,56 +200,83 @@ public:
     void addactions(unsigned) { _pn->quit(); }
 };
 
-class PetriNet : public IPetriNet
+class PetriNetBase : public IPetriNet
 {
     static const unsigned _defaultThreads = 4;
+    void assertPlace(PNNode* n)
+    {
+        if ( _places.find(n) == _places.end() )
+        {
+            cout << "Place not found: " << n->_name << endl;
+            exit(1);
+        }
+    }
+    void assertTransition(PNNode* n)
+    {
+        if ( _transitions.find(n) == _transitions.end() )
+        {
+            cout << "Transition not found: " << n->_name << endl;
+            exit(1);
+        }
+    }
+protected:
     Places _places;
     Transitions _transitions;
     Arcs _arcs;
 
-    void setpn()
-    {
-        for(auto n:_places) n->setpn(this);
-        for(auto n:_transitions) n->setpn(this);
-    }
 public:
-
+    PNTransition* createTransition(string name)
+    {
+        return new PNTransition(name, this);
+    }
+    PNPlace* createPlace(string name, unsigned marking=0, unsigned capacity=0)
+    {
+        return new PNPlace(name, this, marking, capacity);
+    }
+    PNPlace* createQuitPlace(string name, unsigned marking=0, unsigned capacity=0)
+    {
+        return new PNQuitPlace(name, this, marking, capacity);
+    }
     // returns intermediate node if it was inserted between PP/TT else NULL
     // adds the created arc(s) and intermediate node (if any) to Elements pnes
     // For intermediate node (if any) optional argument 'name' can be passed
-    static PNNode* createArc(PNNode *n1, PNNode *n2, Elements& pnes, string name = "")
+    PNNode* createArc(PNNode *n1, PNNode *n2, string name = "")
     {
-        pnes.insert(n1);
-        pnes.insert(n2);
         if ( n1->typ() == PNElement::TRANSITION )
         {
+            assertTransition(n1);
             if ( n2->typ() == PNElement::TRANSITION )
             {
+                assertTransition(n2);
                 auto *dummy = new PNPlace(name);
-                pnes.insert(dummy);
-                pnes.insert(new PNTPArc((PNTransition*)n1,dummy));
-                pnes.insert(new PNPTArc(dummy,(PNTransition*)n2));
+                _places.insert(dummy);
+                _arcs.insert(new PNTPArc((PNTransition*)n1,dummy));
+                _arcs.insert(new PNPTArc(dummy,(PNTransition*)n2));
                 return dummy;
             }
             else
             {
-                pnes.insert(new PNTPArc((PNTransition*)n1,(PNPlace*)n2));
+                assertPlace(n2);
+                _arcs.insert(new PNTPArc((PNTransition*)n1,(PNPlace*)n2));
                 return NULL;
             }
         }
         else
         {
+            assertPlace(n1);
             if ( n2->typ() == PNElement::TRANSITION )
             {
-                pnes.insert(new PNPTArc((PNPlace*)n1,(PNTransition*)n2));
+                assertTransition(n2);
+                _arcs.insert(new PNPTArc((PNPlace*)n1,(PNTransition*)n2));
                 return NULL;
             }
             else
             {
+                assertPlace(n2);
                 auto *dummy = new PNTransition(name);
-                pnes.insert(dummy);
-                pnes.insert(new PNPTArc((PNPlace*)n1,dummy));
-                pnes.insert(new PNTPArc(dummy,(PNPlace*)n2));
+                _transitions.insert(dummy);
+                _arcs.insert(new PNPTArc((PNPlace*)n1,dummy));
+                _arcs.insert(new PNTPArc(dummy,(PNPlace*)n2));
                 return dummy;
             }
         }
@@ -445,22 +364,115 @@ public:
         for(auto e:_arcs) delete e;
     }
 
-    void init() { for(auto p:_places) p->init(); }
-    PetriNet(Elements elements, function<void(unsigned)> eventListener = [](unsigned){})
+    PetriNetBase(function<void(unsigned)> eventListener = [](unsigned){})
         : IPetriNet(eventListener)
+    {}
+};
+
+class MTPetriNet : public PetriNetBase
+{
+using PetriNetBase::PetriNetBase;
+
+// Transition methods (See Design note)
+    void tryTrigger(PNTransition *transition)
     {
-        for(auto e:elements)
-            switch(e->typ())
+        Arcs::iterator it = transition->_iarcs.begin();
+        while(transition->haveEnoughTokens())
+            if(tryTransferTokens(transition,it))
             {
-                case PNElement::PLACE: _places.push_back((PNPlace*)e); break;
-                case PNElement::TRANSITION: _transitions.push_back((PNTransition*)e); break;
-                case PNElement::ARC: _arcs.push_back((PNArc*)e); break;
+                for(auto iarc:transition->_iarcs) iarc->_place->deductactions(iarc->_wt);
+#               ifdef USESEQNO
+                transition->enabledactions(_pn->_eseqno++);
+#               else
+                transition->enabledactions(0);
+#               endif
+                for(auto oarc:_oarcs) addtokens(oarc->place, oarc->_wt);
             }
-        setpn();
     }
+    // Recursive walk helps keep it simple to avoid locking input places in
+    // case previous ones do not meet the criteria
+    bool tryTransferTokens(PNTransition transition, Arcs::iterator it)
+    {
+        if(it==_iarcs.end()) return true;
+        auto ptarc = *it;
+        if(ptarc->_place->lockIfEnough(ptarc->_wt))
+        {
+            if(tryTransferTokens(transition,++it))
+            {
+                deducttokens(ptarc->_place, ptarc->_wt);
+                ptarc->_place->unlock();
+                return true;
+            }
+            else
+            {
+                ptarc->_place->unlock();
+                return false;
+            }
+        }
+        else return false;
+    }
+    void gotEnoughTokens(PNTransition* transition)
+    {
+        transition->_enabledPlaceCntMutex.lock();
+        transition->_enabledPlaceCnt++;
+        if(transition->haveEnoughTokens()) addwork(bind(&MTPetriNet::tryTrigger,transition));
+        else transition->notEnoughTokensActions();
+        transition->_enabledPlaceCntMutex.unlock();
+    }
+    void notEnoughTokens(PNTransition* transition)
+    {
+        transition->_enabledPlaceCntMutex.lock();
+        if( transition->_enabledPlaceCnt > 0 ) transition->_enabledPlaceCnt--;
+        transition->_enabledPlaceCntMutex.unlock();
+    }
+// Place methods (See Design note)
+    // deducttokens Expects caller to have taken care of locking
+    void deducttokens(PNPlace* place, unsigned tokens)
+    {
+        unsigned oldcnt = place->_tokens;
+        place->_tokens -= tokens;
+        for(auto oarc:_oarcs)
+            // inform the transition only if we went below the threshold now
+            if( place->_tokens < oarc->_wt && oldcnt >= oarc->_wt )
+                notEnoughTokens((PNTransition*)oarc->_transition);
+    }
+    void addtokens(PNPlace* place, unsigned newtokens)
+    {
+        Arcs eligibleArcs;
+        if ( place->_arcchooser != NULL )
+        {
+            list<int> arcindices = place->_arcchooser();
+            for(auto i:arcindices)
+                eligibleArcs.push_back(place->_oarcs[i]);
+        }
+        else
+            eligibleArcs = place->_oarcs;
+
+        place->lock();
+        unsigned oldcnt = place->_tokens;
+        place->_tokens += newtokens;
+        for(auto oarc:eligibleArcs)
+            // inform the transition only if we crossed the threshold now
+            // Think, whether we want to randomize the sequence of oarc for non
+            // determinism Of course, without it also the behavior is correct,
+            // since a deterministic sequence is a subset of possible non
+            // deterministic behaviors anyway.
+            if( place->_tokens >= oarc->_wt && oldcnt < oarc->_wt )
+                ((PNTransition*)oarc->_transition)->gotEnoughTokens();
+        place->unlock();
+        place->addactions(newtokens);
+    }
+public:
+    void init()
+    {
+        for(auto p:_places)
+            if ( p->marking() )
+                addtokens(p, p->marking())
+    }
+
 };
 
 // Use this macro in exactly 1 cpp file in the application
-#define PETRINET_STATICS thread_local queue<Work> MTEngine::_lq; unsigned IPetriNet::_idcntr = 0;
+#define PETRINET_STATICS thread_local queue<Work> MTEngine::_lq;
 
 #endif
