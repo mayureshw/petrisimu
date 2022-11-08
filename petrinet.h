@@ -32,7 +32,9 @@
 
 class PNArc;
 class PNPlace;
+class PNQuitPlace;
 class PNTransition;
+class PNNode;
 typedef vector<PNArc*> Arcs; // a vector to aid filtering by indices
 typedef set<PNPlace*> Places;
 typedef set<PNTransition*> Transitions;
@@ -42,10 +44,18 @@ class IPetriNet : public MTEngine
 {
     function<void(unsigned)> _eventListener;
 public:
-    static unsigned _idcntr;
+    unsigned _idcntr = 0;
 #   ifdef USESEQNO
     atomic<unsigned long> _eseqno = 0;
 #   endif
+    virtual PNTransition* createTransition(string name)=0;
+    virtual PNPlace* createPlace(string name, unsigned marking=0, unsigned capacity=0)=0;
+    virtual PNQuitPlace* createQuitPlace(string name, unsigned marking=0, unsigned capacity=0)=0;
+    virtual PNNode* createArc(PNNode *n1, PNNode *n2, string name = "")=0;
+    virtual void printdot(string filename="petri.dot")=0;
+    virtual void printpnml(string filename="petri.pnml")=0;
+    virtual void deleteElems()=0;
+    virtual void addtokens(PNPlace* place, unsigned newtokens)=0;
     void tellListener(unsigned e) { _eventListener(e); }
     IPetriNet(function<void(unsigned)> eventListener) : _eventListener(eventListener) {}
 };
@@ -84,7 +94,7 @@ public:
     void addoarc(PNArc* a) { _oarcs.push_back(a); }
     string idlabel() { return idstr() + ":" + _name; }
     string idstr() { return to_string(_nodeid); }
-    PNNode(string name, IPetriNet* pn) : _name(name), _nodeid(IPetriNet::_idcntr++), _pn(pn) {}
+    PNNode(string name, IPetriNet* pn) : _name(name), _nodeid(pn->_idcntr++), _pn(pn) {}
 };
 
 class PNPlace : public PNNode
@@ -93,14 +103,26 @@ class PNPlace : public PNNode
     unsigned _marking;
     unsigned _capacity;
     mutex _tokenmutex;
+protected:
+    function<void()> _addactions = [](){};
+public:
     virtual void addactions(unsigned newtokens)
     {
         PNLOG("p:" << idstr() << ":+" << newtokens << ":" << _tokens << ":" << _name)
         _addactions();
     }
-protected:
-    function<void()> _addactions = [](){};
-public:
+    Arcs eligibleArcs()
+    {
+        if ( _arcchooser != NULL )
+        {
+            Arcs retarcs;
+            list<int> arcindices = _arcchooser();
+            for(auto i:arcindices)
+                retarcs.push_back(_oarcs[i]);
+            return retarcs;
+        }
+        else return _oarcs;
+    }
     void setMarking(unsigned marking) { _marking = marking; }
     // This can be put on queue by adding a wrapper that does addwork, for granularity reason it wasn't
     unsigned marking() { return _marking; }
@@ -132,11 +154,9 @@ public:
 
 class PNTransition : public PNNode
 {
-    unsigned _enabledPlaceCnt = 0;
-    mutex _enabledPlaceCntMutex;
-    bool haveEnoughTokens() { return _enabledPlaceCnt == _iarcs.size(); }
     function<void(unsigned long)> _enabledactions = [](unsigned long){};
     function<unsigned long()> _delayfn = [](){ return 0; };
+public:
     virtual void notEnoughTokensActions()
     {
         PNLOG("wait:" << idlabel())
@@ -157,12 +177,14 @@ class PNTransition : public PNNode
     // tokens, there can be other contenders for those tokens who may consume
     // them, hence we need to check again whether this transition can fire by
     // holding all predecessor places' counts under a lock
-public:
+    unsigned _enabledPlaceCnt = 0;
+    mutex _enabledPlaceCntMutex;
+    bool haveEnoughTokens() { return _enabledPlaceCnt == _iarcs.size(); }
     void setEnabledActions(function<void(unsigned long)> af) { _enabledactions = af; }
     void setDelayFn( function<unsigned long()> df ) { _delayfn = df; }
     Etyp typ() { return TRANSITION; }
     DNode dnode() { return DNode(idstr(),(Proplist){{"shape","rectangle"},{"label","t:"+idlabel()}}); }
-    PNTransition(string name, IPetriNet *pn): PNNode(name), _pn(pn) {}
+    PNTransition(string name, IPetriNet *pn): PNNode(name, pn) {}
     virtual ~PNTransition() {}
 };
 
@@ -202,8 +224,8 @@ public:
 
 class PetriNetBase : public IPetriNet
 {
-    static const unsigned _defaultThreads = 4;
-    void assertPlace(PNNode* n)
+    const unsigned _defaultThreads = 4;
+    void assertPlacePresent(PNPlace* n)
     {
         if ( _places.find(n) == _places.end() )
         {
@@ -211,7 +233,7 @@ class PetriNetBase : public IPetriNet
             exit(1);
         }
     }
-    void assertTransition(PNNode* n)
+    void assertTransitionPresent(PNTransition* n)
     {
         if ( _transitions.find(n) == _transitions.end() )
         {
@@ -227,15 +249,21 @@ protected:
 public:
     PNTransition* createTransition(string name)
     {
-        return new PNTransition(name, this);
+        auto t = new PNTransition(name, this);
+        _transitions.insert(t);
+        return t;
     }
     PNPlace* createPlace(string name, unsigned marking=0, unsigned capacity=0)
     {
-        return new PNPlace(name, this, marking, capacity);
+        auto p = new PNPlace(name, this, marking, capacity);
+        _places.insert(p);
+        return p;
     }
-    PNPlace* createQuitPlace(string name, unsigned marking=0, unsigned capacity=0)
+    PNQuitPlace* createQuitPlace(string name, unsigned marking=0, unsigned capacity=0)
     {
-        return new PNQuitPlace(name, this, marking, capacity);
+        auto p = new PNQuitPlace(name, this, marking, capacity);
+        _places.insert(p);
+        return p;
     }
     // returns intermediate node if it was inserted between PP/TT else NULL
     // adds the created arc(s) and intermediate node (if any) to Elements pnes
@@ -244,39 +272,37 @@ public:
     {
         if ( n1->typ() == PNElement::TRANSITION )
         {
-            assertTransition(n1);
+            assertTransitionPresent((PNTransition*)n1);
             if ( n2->typ() == PNElement::TRANSITION )
             {
-                assertTransition(n2);
-                auto *dummy = new PNPlace(name);
-                _places.insert(dummy);
-                _arcs.insert(new PNTPArc((PNTransition*)n1,dummy));
-                _arcs.insert(new PNPTArc(dummy,(PNTransition*)n2));
+                assertTransitionPresent((PNTransition*)n2);
+                auto *dummy = createPlace(name);
+                _arcs.push_back(new PNTPArc((PNTransition*)n1,dummy));
+                _arcs.push_back(new PNPTArc(dummy,(PNTransition*)n2));
                 return dummy;
             }
             else
             {
-                assertPlace(n2);
-                _arcs.insert(new PNTPArc((PNTransition*)n1,(PNPlace*)n2));
+                assertPlacePresent((PNPlace*)n2);
+                _arcs.push_back(new PNTPArc((PNTransition*)n1,(PNPlace*)n2));
                 return NULL;
             }
         }
         else
         {
-            assertPlace(n1);
+            assertPlacePresent((PNPlace*)n1);
             if ( n2->typ() == PNElement::TRANSITION )
             {
-                assertTransition(n2);
-                _arcs.insert(new PNPTArc((PNPlace*)n1,(PNTransition*)n2));
+                assertTransitionPresent((PNTransition*)n2);
+                _arcs.push_back(new PNPTArc((PNPlace*)n1,(PNTransition*)n2));
                 return NULL;
             }
             else
             {
-                assertPlace(n2);
-                auto *dummy = new PNTransition(name);
-                _transitions.insert(dummy);
-                _arcs.insert(new PNPTArc((PNPlace*)n1,dummy));
-                _arcs.insert(new PNTPArc(dummy,(PNPlace*)n2));
+                assertPlacePresent((PNPlace*)n2);
+                auto *dummy = createTransition(name);
+                _arcs.push_back(new PNPTArc((PNPlace*)n1,dummy));
+                _arcs.push_back(new PNTPArc(dummy,(PNPlace*)n2));
                 return dummy;
             }
         }
@@ -381,19 +407,22 @@ using PetriNetBase::PetriNetBase;
             if(tryTransferTokens(transition,it))
             {
                 for(auto iarc:transition->_iarcs) iarc->_place->deductactions(iarc->_wt);
+                transition->enabledactions
+                (
 #               ifdef USESEQNO
-                transition->enabledactions(_pn->_eseqno++);
+                    _pn->_eseqno++
 #               else
-                transition->enabledactions(0);
+                    0
 #               endif
-                for(auto oarc:_oarcs) addtokens(oarc->place, oarc->_wt);
+                );
+                for(auto oarc:transition->_oarcs) addtokens(oarc->_place, oarc->_wt);
             }
     }
     // Recursive walk helps keep it simple to avoid locking input places in
     // case previous ones do not meet the criteria
-    bool tryTransferTokens(PNTransition transition, Arcs::iterator it)
+    bool tryTransferTokens(PNTransition* transition, Arcs::iterator it)
     {
-        if(it==_iarcs.end()) return true;
+        if(it==transition->_iarcs.end()) return true;
         auto ptarc = *it;
         if(ptarc->_place->lockIfEnough(ptarc->_wt))
         {
@@ -415,7 +444,8 @@ using PetriNetBase::PetriNetBase;
     {
         transition->_enabledPlaceCntMutex.lock();
         transition->_enabledPlaceCnt++;
-        if(transition->haveEnoughTokens()) addwork(bind(&MTPetriNet::tryTrigger,transition));
+        Work tryTriggerWrok = bind(&MTPetriNet::tryTrigger,this,transition);
+        if(transition->haveEnoughTokens()) addwork(tryTriggerWrok);
         else transition->notEnoughTokensActions();
         transition->_enabledPlaceCntMutex.unlock();
     }
@@ -431,23 +461,14 @@ using PetriNetBase::PetriNetBase;
     {
         unsigned oldcnt = place->_tokens;
         place->_tokens -= tokens;
-        for(auto oarc:_oarcs)
+        for(auto oarc:place->_oarcs)
             // inform the transition only if we went below the threshold now
             if( place->_tokens < oarc->_wt && oldcnt >= oarc->_wt )
                 notEnoughTokens((PNTransition*)oarc->_transition);
     }
     void addtokens(PNPlace* place, unsigned newtokens)
     {
-        Arcs eligibleArcs;
-        if ( place->_arcchooser != NULL )
-        {
-            list<int> arcindices = place->_arcchooser();
-            for(auto i:arcindices)
-                eligibleArcs.push_back(place->_oarcs[i]);
-        }
-        else
-            eligibleArcs = place->_oarcs;
-
+        Arcs eligibleArcs = place->eligibleArcs();
         place->lock();
         unsigned oldcnt = place->_tokens;
         place->_tokens += newtokens;
@@ -458,7 +479,7 @@ using PetriNetBase::PetriNetBase;
             // since a deterministic sequence is a subset of possible non
             // deterministic behaviors anyway.
             if( place->_tokens >= oarc->_wt && oldcnt < oarc->_wt )
-                ((PNTransition*)oarc->_transition)->gotEnoughTokens();
+                gotEnoughTokens((PNTransition*)oarc->_transition);
         place->unlock();
         place->addactions(newtokens);
     }
@@ -467,7 +488,7 @@ public:
     {
         for(auto p:_places)
             if ( p->marking() )
-                addtokens(p, p->marking())
+                addtokens(p, p->marking());
     }
 
 };
