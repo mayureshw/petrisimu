@@ -11,63 +11,55 @@ PETRINET_STATICS
 // As a convention: Philisopher n's left hand fork is numbered n
 class Diner
 {
+    IPetriNet *_pn;
 public:
     string _id;
-    PNPlace
-        *eating = new PNPlace("eating"+_id),
-        *thinking = new PNPlace("thinking"+_id),
-        *free_fork = new PNPlace("free_fork"+_id);
-    PNTransition
-        *strt_eating = new PNTransition("strt_eating"+_id),
-        *strt_thinking = new PNTransition("strt_thinking"+_id);
-    list<PNPlace*> places = {
-        eating, thinking, free_fork
-        };
-    list<PNTransition*> transitions = {
-        strt_eating, strt_thinking
-        };
-    Arcs arcs = {
-        new PNPTArc(free_fork,strt_eating),
-        new PNPTArc(thinking,strt_eating),
-        new PNPTArc(eating,strt_thinking),
+    PNPlace *eating, *thinking, *free_fork;
+    PNTransition *strt_eating, *strt_thinking;
+    Diner(IPetriNet *pn, int id) : _id(to_string(id)), _pn(pn)
+    {
+        eating    = _pn->createPlace("eating"+_id),
+        thinking  = _pn->createPlace("thinking"+_id),
+        free_fork = _pn->createPlace("free_fork"+_id);
 
-        new PNTPArc(strt_eating,eating),
-        new PNTPArc(strt_thinking,free_fork),
-        new PNTPArc(strt_thinking,thinking),
-        };
-    Diner(int id) : _id(to_string(id)) {}
+        strt_eating   = _pn->createTransition("strt_eating"+_id),
+        strt_thinking = _pn->createTransition("strt_thinking"+_id);
+
+        _pn->createArc(free_fork,strt_eating);
+        _pn->createArc(thinking,strt_eating);
+        _pn->createArc(eating,strt_thinking);
+
+        _pn->createArc(strt_eating,eating);
+        _pn->createArc(strt_thinking,free_fork);
+        _pn->createArc(strt_thinking,thinking);
+    }
 };
 
 class DinerFactory
 {
 public:
-    PetriNet *pn;
+    IPetriNet *_pn = new MTPetriNet();
     DinerFactory(int nDiners)
     {
         vector<Diner> diners;
-        Elements pnes;
-        for(int i;i<nDiners;i++) diners.push_back(Diner(i));
+        for(int i;i<nDiners;i++) diners.push_back(Diner(_pn,i));
         for(int i;i<nDiners;i++)
         {
             Diner& prev = i ? diners[i-1] : diners[nDiners-1], cur = diners[i];
-            prev.arcs.push_back(new PNPTArc(cur.free_fork,prev.strt_eating));
-            prev.arcs.push_back(new PNTPArc(prev.strt_thinking,cur.free_fork));
-            for(auto p:prev.places) pnes.insert(p);
-            for(auto t:prev.transitions) pnes.insert(t);
-            for(auto a:prev.arcs) pnes.insert(a);
+            _pn->createArc(cur.free_fork,prev.strt_eating);
+            _pn->createArc(prev.strt_thinking,cur.free_fork);
         }
-        pn = new PetriNet(pnes);
         // Place tokens only after constituting full net
         for(auto d:diners)
         {
-            d.free_fork->addtokens(1);
-            d.thinking->addtokens(1);
+            _pn->addtokens(d.free_fork,1);
+            _pn->addtokens(d.thinking,1);
         }
     }
     ~DinerFactory()
     {
-        pn->deleteElems();
-        delete pn;
+        _pn->deleteElems();
+        delete _pn;
     }
 };
 
@@ -75,6 +67,6 @@ int main()
 {
     // No of philosophers that end up dining varies before it deadlocks
     DinerFactory df(2);
-    df.pn->printdot();
-    df.pn->wait();
+    df._pn->printdot();
+    df._pn->wait();
 }

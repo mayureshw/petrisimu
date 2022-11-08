@@ -8,64 +8,62 @@ PETRINET_STATICS
 
 int main()
 {
+    IPetriNet *pn = new MTPetriNet();
     auto
-        *at1 = new PNPlace("at1"),
-        *use1 = new PNPlace("use1"),
-        *done1 = new PNPlace("done1"),
-        *drive1 = new PNPlace("drive1"),
+        at1    = pn->createPlace("at1"),
+        use1   = pn->createPlace("use1"),
+        done1  = pn->createPlace("done1"),
+        drive1 = pn->createPlace("drive1"),
     
-        *at2 = new PNPlace("at2"),
-        *use2 = new PNPlace("use2"),
-        *done2 = new PNPlace("done2"),
-        *drive2 = new PNPlace("drive2"),
+        at2    = pn->createPlace("at2"),
+        use2   = pn->createPlace("use2"),
+        done2  = pn->createPlace("done2"),
+        drive2 = pn->createPlace("drive2"),
 
-        *mutex = new PNPlace("mutex");
+        mutex = pn->createPlace("mutex");
 
     auto
-        *toat1 = new PNTransition("toat1"),
-        *touse1 = new PNTransition("touse1"),
-        *todone1 = new PNTransition("todone1"),
-        *todrive1 = new PNTransition("todrive1"),
+        toat1    = pn->createTransition("toat1"),
+        touse1   = pn->createTransition("touse1"),
+        todone1  = pn->createTransition("todone1"),
+        todrive1 = pn->createTransition("todrive1"),
 
-        *toat2 = new PNTransition("toat2"),
-        *touse2 = new PNTransition("touse2"),
-        *todone2 = new PNTransition("todone2"),
-        *todrive2 = new PNTransition("todrive2");
+        toat2    = pn->createTransition("toat2"),
+        touse2   = pn->createTransition("touse2"),
+        todone2  = pn->createTransition("todone2"),
+        todrive2 = pn->createTransition("todrive2");
 
-    Elements pnes = {
-        at1,use1,done1,drive1,mutex,at2,use2,done2,drive2,toat1,touse1,todone1,todrive1,toat2,touse2,todone2,todrive2,
-        new PNPTArc(at1,touse1),
-        new PNPTArc(use1,todone1),
-        new PNPTArc(done1,todrive1),
-        new PNPTArc(drive1,toat1),
-        new PNTPArc(toat1,at1),
-        new PNTPArc(touse1,use1),
-        new PNTPArc(todone1,done1),
-        new PNTPArc(todrive1,drive1),
+        pn->createArc(at1,touse1);
+        pn->createArc(use1,todone1);
+        pn->createArc(done1,todrive1);
+        pn->createArc(drive1,toat1);
+        pn->createArc(toat1,at1);
+        pn->createArc(touse1,use1);
+        pn->createArc(todone1,done1);
+        pn->createArc(todrive1,drive1);
 
-        new PNPTArc(at2,touse2),
-        new PNPTArc(use2,todone2),
-        new PNPTArc(done2,todrive2),
-        new PNPTArc(drive2,toat2),
-        new PNTPArc(toat2,at2),
-        new PNTPArc(touse2,use2),
-        new PNTPArc(todone2,done2),
-        new PNTPArc(todrive2,drive2),
+        pn->createArc(at2,touse2);
+        pn->createArc(use2,todone2);
+        pn->createArc(done2,todrive2);
+        pn->createArc(drive2,toat2);
+        pn->createArc(toat2,at2);
+        pn->createArc(touse2,use2);
+        pn->createArc(todone2,done2);
+        pn->createArc(todrive2,drive2);
 
-        new PNPTArc(mutex,touse1),
-        new PNTPArc(todone1,mutex),
-        new PNPTArc(mutex,touse2),
-        new PNTPArc(todone2,mutex),
-        };
+        pn->createArc(mutex,touse1);
+        pn->createArc(todone1,mutex);
+        pn->createArc(mutex,touse2);
+        pn->createArc(todone2,mutex);
 
-    PetriNet pn(pnes);
-    pn.printdot();
-    mutex->addtokens(1);
+    pn->printdot();
+    pn->addtokens(mutex,1);
     // Deliberately add 2 tokens, to test that transition doesn't deadlock if
     // token supply remains high after transition (without dipping to low in
     // between)
-    drive1->addtokens(2);
-    drive2->addtokens(2);
-    pn.wait();
-    pn.deleteElems();
+    pn->addtokens(drive1,2);
+    pn->addtokens(drive2,2);
+    pn->wait();
+    pn->deleteElems();
+    delete pn;
 }

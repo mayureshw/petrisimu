@@ -1,4 +1,4 @@
-CPPFLAGS	+=	-O3
+CXXFLAGS	+=	-DPNDBG -O3
 LDFLAGS		+=	-lpthread
 SRCS		=	$(wildcard *.cpp)
 HDRS		=	$(wildcard ../*.h)
