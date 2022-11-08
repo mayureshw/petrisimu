@@ -466,6 +466,7 @@ using PetriNetBase::PetriNetBase;
             if( place->_tokens < oarc->_wt && oldcnt >= oarc->_wt )
                 notEnoughTokens((PNTransition*)oarc->_transition);
     }
+public:
     void addtokens(PNPlace* place, unsigned newtokens)
     {
         Arcs eligibleArcs = place->eligibleArcs();
@@ -483,7 +484,6 @@ using PetriNetBase::PetriNetBase;
         place->unlock();
         place->addactions(newtokens);
     }
-public:
     void init()
     {
         for(auto p:_places)
