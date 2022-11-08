@@ -410,7 +410,7 @@ using PetriNetBase::PetriNetBase;
                 transition->enabledactions
                 (
 #               ifdef USESEQNO
-                    _pn->_eseqno++
+                    _eseqno++
 #               else
                     0
 #               endif
