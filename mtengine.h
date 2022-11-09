@@ -24,7 +24,6 @@ class MTEngine
     queue<Work> _gq;
     mutex _gq_mutex;
     condition_variable _gq_cvar;
-    bool _quit = false;
 
     void dolocal()
     {
@@ -63,6 +62,8 @@ class MTEngine
             else work();
         }
     }
+protected:
+    bool _quit = false;
 public:
     void addwork(Work& work)
     {
