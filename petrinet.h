@@ -1,9 +1,12 @@
 #ifndef _PETRINET_H
 #define _PETRINET_H
 
+#include <random>
+#include <time.h>
 #include <iostream>
 #include <string>
 #include <list>
+#include <queue>
 #include <set>
 #ifdef USESEQNO
 #   include <atomic>
@@ -154,8 +157,10 @@ public:
 
 class PNTransition : public PNNode
 {
+    default_random_engine _rng;
+    poisson_distribution<unsigned long> _poisson { (double) ( ((unsigned long) -1) >> 1 ) };
     function<void(unsigned long)> _enabledactions = [](unsigned long){};
-    function<unsigned long()> _delayfn = [](){ return 0; };
+    function<unsigned long()> _delayfn = [this](){ return _poisson(_rng); };
 public:
     virtual void notEnoughTokensActions()
     {
@@ -179,12 +184,22 @@ public:
     // holding all predecessor places' counts under a lock
     unsigned _enabledPlaceCnt = 0;
     mutex _enabledPlaceCntMutex;
-    bool haveEnoughTokens() { return _enabledPlaceCnt == _iarcs.size(); }
+    bool hasEnabledPlaces() { return _enabledPlaceCnt == _iarcs.size(); }
+    bool mayFire()
+    {
+        for(auto ia:_iarcs)
+            if ( ia->_place->_tokens < ia->_wt ) return false;
+        return true;
+    }
     void setEnabledActions(function<void(unsigned long)> af) { _enabledactions = af; }
     void setDelayFn( function<unsigned long()> df ) { _delayfn = df; }
+    unsigned long delay() { return _delayfn(); }
     Etyp typ() { return TRANSITION; }
     DNode dnode() { return DNode(idstr(),(Proplist){{"shape","rectangle"},{"label","t:"+idlabel()}}); }
-    PNTransition(string name, IPetriNet *pn): PNNode(name, pn) {}
+    PNTransition(string name, IPetriNet *pn): PNNode(name, pn)
+    {
+        _rng.seed(time(NULL));
+    }
     virtual ~PNTransition() {}
 };
 
@@ -224,7 +239,6 @@ public:
 
 class PetriNetBase : public IPetriNet
 {
-    const unsigned _defaultThreads = 4;
     void assertPlacePresent(PNPlace* n)
     {
         if ( _places.find(n) == _places.end() )
@@ -245,7 +259,19 @@ protected:
     Places _places;
     Transitions _transitions;
     Arcs _arcs;
-
+    virtual void _postinit() {}
+    // Note: Fire is to be called after deducting tokens from sources
+    // it will add tokens to destinations
+    void fire(PNTransition* t)
+    {
+        for(auto iarc:t->_iarcs) iarc->_place->deductactions(iarc->_wt);
+#       ifdef USESEQNO
+        t->enabledactions ( _eseqno++ );
+#       else
+        t->enabledactions ( 0 );
+#       endif
+        for(auto oarc:t->_oarcs) addtokens(oarc->_place, oarc->_wt);
+    }
 public:
     PNTransition* createTransition(string name)
     {
@@ -389,7 +415,13 @@ public:
         for(auto n:_transitions) delete n;
         for(auto e:_arcs) delete e;
     }
-
+    void init()
+    {
+        for(auto p:_places)
+            if ( p->marking() )
+                addtokens(p, p->marking());
+        _postinit();
+    }
     PetriNetBase(function<void(unsigned)> eventListener = [](unsigned){})
         : IPetriNet(eventListener)
     {}
@@ -403,20 +435,8 @@ using PetriNetBase::PetriNetBase;
     void tryTrigger(PNTransition *transition)
     {
         Arcs::iterator it = transition->_iarcs.begin();
-        while(transition->haveEnoughTokens())
-            if(tryTransferTokens(transition,it))
-            {
-                for(auto iarc:transition->_iarcs) iarc->_place->deductactions(iarc->_wt);
-                transition->enabledactions
-                (
-#               ifdef USESEQNO
-                    _eseqno++
-#               else
-                    0
-#               endif
-                );
-                for(auto oarc:transition->_oarcs) addtokens(oarc->_place, oarc->_wt);
-            }
+        while(transition->hasEnabledPlaces())
+            if(tryTransferTokens(transition,it)) fire(transition);
     }
     // Recursive walk helps keep it simple to avoid locking input places in
     // case previous ones do not meet the criteria
@@ -445,7 +465,7 @@ using PetriNetBase::PetriNetBase;
         transition->_enabledPlaceCntMutex.lock();
         transition->_enabledPlaceCnt++;
         Work tryTriggerWrok = bind(&MTPetriNet::tryTrigger,this,transition);
-        if(transition->haveEnoughTokens()) addwork(tryTriggerWrok);
+        if(transition->hasEnabledPlaces()) addwork(tryTriggerWrok);
         else transition->notEnoughTokensActions();
         transition->_enabledPlaceCntMutex.unlock();
     }
@@ -484,13 +504,90 @@ public:
         place->unlock();
         place->addactions(newtokens);
     }
-    void init()
-    {
-        for(auto p:_places)
-            if ( p->marking() )
-                addtokens(p, p->marking());
-    }
+};
 
+// TODO: Decide how to use multiple cores for STPN. Either start multiple
+// simulations over threads or let the user start multiple processes. Log
+// clashes should be avoided when doing so.
+class STPetriNet : public PetriNetBase
+{
+using PetriNetBase::PetriNetBase;
+using t_pair  = pair<unsigned long, PNTransition*>;
+// Saves the overhead of comparing 2nd member of the pair
+class PriorityLT
+{
+public:
+    bool operator() (t_pair& l, t_pair& r) { return l.first < r.first; }
+};
+using t_queue = priority_queue<t_pair, vector<t_pair>, PriorityLT>;
+
+    t_queue _tq;
+    mutex _tqmutex;
+    condition_variable _tq_cvar;
+
+    void _simuloop()
+    {
+        while ( true )
+        {
+            _tqmutex.lock();
+            if ( _tq.empty() )
+            {
+                _tqmutex.unlock();
+                break;
+            }
+            auto t = _tq.top().second;
+            _tq.pop();
+            _tqmutex.unlock();
+            // this was checked when adding to _tq, but marking may change
+            // till its turn comes, so check again
+            if ( t->mayFire() )
+            {
+                for(auto ia:t->_iarcs)
+                {
+                    auto p = ia->_place;
+                    p->lock();
+                    p->_tokens -= ia->_wt;
+                    p->unlock();
+                }
+                fire(t);
+            }
+        }
+    }
+    void simuloop()
+    {
+        while ( not _quit )
+        {
+            _simuloop();
+            unique_lock<mutex> ulockq(_tqmutex);
+            _tq_cvar.wait(ulockq, [](){return true;});
+        }
+    }
+    void _postinit()
+    {
+        Work w = bind(&STPetriNet::simuloop,this);
+        addwork(w);
+    }
+public:
+    void addtokens(PNPlace* place, unsigned newtokens)
+    {
+        place->lock();
+        place->_tokens += newtokens;
+        place->unlock();
+        place->addactions(newtokens);
+        Arcs eligibleArcs = place->eligibleArcs();
+        for(auto oarc:eligibleArcs)
+        {
+            auto t = oarc->_transition;
+            if ( t->mayFire() )
+            {
+                _tqmutex.lock();
+                _tq.push( { t->delay(), t } );
+                _tqmutex.unlock();
+            }
+        }
+        unique_lock<mutex> ulockq(_tqmutex);
+        _tq_cvar.notify_one();
+    }
 };
 
 // Use this macro in exactly 1 cpp file in the application
