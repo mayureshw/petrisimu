@@ -1,8 +1,6 @@
 #ifndef _PETRINET_H
 #define _PETRINET_H
 
-#include <random>
-#include <time.h>
 #include <iostream>
 #include <string>
 #include <list>
@@ -157,10 +155,8 @@ public:
 
 class PNTransition : public PNNode
 {
-    default_random_engine _rng;
-    poisson_distribution<unsigned long> _poisson { (double) ( ((unsigned long) -1) >> 1 ) };
     function<void(unsigned long)> _enabledactions = [](unsigned long){};
-    function<unsigned long()> _delayfn = [this](){ return _poisson(_rng); };
+    function<unsigned long()> _delayfn = [](){ return 0; };
 public:
     virtual void notEnoughTokensActions()
     {
@@ -196,10 +192,7 @@ public:
     unsigned long delay() { return _delayfn(); }
     Etyp typ() { return TRANSITION; }
     DNode dnode() { return DNode(idstr(),(Proplist){{"shape","rectangle"},{"label","t:"+idlabel()}}); }
-    PNTransition(string name, IPetriNet *pn): PNNode(name, pn)
-    {
-        _rng.seed(time(NULL));
-    }
+    PNTransition(string name, IPetriNet *pn): PNNode(name, pn) {}
     virtual ~PNTransition() {}
 };
 
