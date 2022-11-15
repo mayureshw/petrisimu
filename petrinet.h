@@ -510,7 +510,8 @@ using t_pair  = pair<unsigned long, PNTransition*>;
 class PriorityLT
 {
 public:
-    bool operator() (t_pair& l, t_pair& r) { return l.first < r.first; }
+    // Since delay is opposite of priority, we use >
+    bool operator() (t_pair& l, t_pair& r) { return l.first > r.first; }
 };
 using t_queue = priority_queue<t_pair, vector<t_pair>, PriorityLT>;
 
