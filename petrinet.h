@@ -505,7 +505,7 @@ public:
 class STPetriNet : public PetriNetBase
 {
 using PetriNetBase::PetriNetBase;
-using t_pair  = pair<unsigned long, PNTransition*>;
+using t_pair  = pair<double, PNTransition*>;
 // Saves the overhead of comparing 2nd member of the pair
 class PriorityLT
 {
