@@ -592,7 +592,4 @@ public:
     }
 };
 
-// Use this macro in exactly 1 cpp file in the application
-#define PETRINET_STATICS thread_local queue<Work> MTEngine::_lq;
-
 #endif

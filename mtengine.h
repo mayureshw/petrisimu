@@ -20,7 +20,7 @@ class MTEngine
 {
     unsigned _lqthreshold; // Add work to _gq if _lq size exeeds this
     list<thread*> _threads;
-    static thread_local queue<Work> _lq; // NOTE: Application must declare it in any one cpp file
+    inline static thread_local queue<Work> _lq; // NOTE: Application must declare it in any one cpp file
     queue<Work> _gq;
     mutex _gq_mutex;
     condition_variable _gq_cvar;
