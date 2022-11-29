@@ -1,7 +1,6 @@
 using namespace std;
 
 #include "petrinet.h"
-PETRINET_STATICS
 
 int main()
 {

@@ -3,7 +3,6 @@ using namespace std;
 #include <string>
 #include <vector>
 #include "petrinet.h"
-PETRINET_STATICS
 
 // Non deadlocking
 

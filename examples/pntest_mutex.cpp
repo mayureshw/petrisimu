@@ -1,7 +1,6 @@
 using namespace std;
 
 #include "petrinet.h"
-PETRINET_STATICS
 
 // https://people.cs.vt.edu/kafura/ComputationalThinking/Class-Notes/Petri-Net-Notes-Expanded.pdf
 // Fig 7

@@ -3,7 +3,6 @@ using namespace std;
 #include <string>
 #include <vector>
 #include "petrinet.h"
-PETRINET_STATICS
 
 // https://www.labri.fr/perso/anca/FDS/Pn-ESTII.pdf
 
