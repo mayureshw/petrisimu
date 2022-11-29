@@ -42,17 +42,17 @@ typedef set<PNTransition*> Transitions;
 class IPetriNet : public MTEngine
 {
     function<void(unsigned)> _eventListener;
-public:
-#ifdef PNDBG
-    inline static ofstream pnlog;
-    inline static mutex pnlogmutex;
-#endif
-    static void setLogfile(string logfile)
+    void setLogfile(string logfile)
     {
 #ifdef PNDBG
     pnlog.open(logfile);
 #endif
     }
+public:
+#ifdef PNDBG
+    ofstream pnlog;
+    mutex pnlogmutex;
+#endif
     unsigned _idcntr = 0;
 #   ifdef USESEQNO
     atomic<unsigned long> _eseqno = 0;
@@ -66,7 +66,10 @@ public:
     virtual void deleteElems()=0;
     virtual void addtokens(PNPlace* place, unsigned newtokens)=0;
     void tellListener(unsigned e) { _eventListener(e); }
-    IPetriNet(function<void(unsigned)> eventListener) : _eventListener(eventListener) {}
+    IPetriNet(string logfile, function<void(unsigned)> eventListener) : _eventListener(eventListener)
+    {
+        setLogfile(logfile);
+    }
 };
 
 class PNElement
@@ -423,8 +426,8 @@ public:
                 addtokens(p, p->marking());
         _postinit();
     }
-    PetriNetBase(function<void(unsigned)> eventListener = [](unsigned){})
-        : IPetriNet(eventListener)
+    PetriNetBase(string logfile = "pteri.log", function<void(unsigned)> eventListener = [](unsigned){})
+        : IPetriNet(logfile, eventListener)
     {}
 };
 
