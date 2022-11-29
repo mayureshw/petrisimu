@@ -13,12 +13,10 @@
 #include "mtengine.h"
 
 #ifdef PNDBG
-    static ofstream pnlog("petri.log");
-    static mutex pnlogmutex;
 #   define PNLOG(ARGS) \
-    pnlogmutex.lock(); \
-    pnlog << ARGS << endl; \
-    pnlogmutex.unlock();
+    _pn->pnlogmutex.lock(); \
+    _pn->pnlog << ARGS << endl; \
+    _pn->pnlogmutex.unlock();
 #else
 #   define PNLOG(ARGS)
 #endif
@@ -45,6 +43,16 @@ class IPetriNet : public MTEngine
 {
     function<void(unsigned)> _eventListener;
 public:
+#ifdef PNDBG
+    inline static ofstream pnlog;
+    inline static mutex pnlogmutex;
+#endif
+    static void setLogfile(string logfile)
+    {
+#ifdef PNDBG
+    pnlog.open(logfile);
+#endif
+    }
     unsigned _idcntr = 0;
 #   ifdef USESEQNO
     atomic<unsigned long> _eseqno = 0;
