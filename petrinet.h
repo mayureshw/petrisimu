@@ -49,6 +49,7 @@ class IPetriNet : public MTEngine
 #endif
     }
 public:
+    string _netname;
 #ifdef PNDBG
     ofstream pnlog;
     mutex pnlogmutex;
@@ -66,9 +67,9 @@ public:
     virtual void deleteElems()=0;
     virtual void addtokens(PNPlace* place, unsigned newtokens)=0;
     void tellListener(unsigned e) { _eventListener(e); }
-    IPetriNet(string logfile, function<void(unsigned)> eventListener) : _eventListener(eventListener)
+    IPetriNet(string netname, function<void(unsigned)> eventListener) : _netname(netname), _eventListener(eventListener)
     {
-        setLogfile(logfile);
+        setLogfile(netname+".petri.log");
     }
 };
 
@@ -426,8 +427,8 @@ public:
                 addtokens(p, p->marking());
         _postinit();
     }
-    PetriNetBase(string logfile = "pteri.log", function<void(unsigned)> eventListener = [](unsigned){})
-        : IPetriNet(logfile, eventListener)
+    PetriNetBase(string netname = "system", function<void(unsigned)> eventListener = [](unsigned){})
+        : IPetriNet(netname, eventListener)
     {}
 };
 
