@@ -41,7 +41,7 @@ typedef set<PNTransition*> Transitions;
 // Interfaces to resolve inter-dependencies
 class IPetriNet : public MTEngine
 {
-    function<void(unsigned)> _eventListener;
+    function<void(unsigned, unsigned long)> _eventListener;
     void setLogfile(string logfile)
     {
 #ifdef PNDBG
@@ -66,8 +66,8 @@ public:
     virtual void printpnml(string filename="petri.pnml")=0;
     virtual void deleteElems()=0;
     virtual void addtokens(PNPlace* place, unsigned newtokens)=0;
-    void tellListener(unsigned e) { _eventListener(e); }
-    IPetriNet(string netname, function<void(unsigned)> eventListener) : _netname(netname), _eventListener(eventListener)
+    void tellListener(unsigned e, unsigned long eseqno) { _eventListener(e, eseqno); }
+    IPetriNet(string netname, function<void(unsigned,unsigned long)> eventListener) : _netname(netname), _eventListener(eventListener)
     {
         setLogfile(netname+".petri.log");
     }
@@ -181,7 +181,7 @@ public:
 // while actions may trigger state changes under the main system under simulation. This sequence ensures
 // that the state changes caused by this event happen only after the listener sees the event.
 #       ifdef PN_USE_EVENT_LISTENER
-        _pn->tellListener(_nodeid);
+        _pn->tellListener(_nodeid, eseqno);
 #       endif
         PNLOG("t:" << idlabel() << ":" << eseqno)
         _enabledactions(eseqno);
@@ -427,7 +427,7 @@ public:
                 addtokens(p, p->marking());
         _postinit();
     }
-    PetriNetBase(string netname = "system", function<void(unsigned)> eventListener = [](unsigned){})
+    PetriNetBase(string netname = "system", function<void(unsigned, unsigned long)> eventListener = [](unsigned, unsigned long){})
         : IPetriNet(netname, eventListener)
     {}
 };
