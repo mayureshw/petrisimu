@@ -61,7 +61,7 @@ public:
     virtual PNTransition* createTransition(string name)=0;
     virtual PNPlace* createPlace(string name, unsigned marking=0, unsigned capacity=0)=0;
     virtual PNQuitPlace* createQuitPlace(string name, unsigned marking=0, unsigned capacity=0)=0;
-    virtual PNNode* createArc(PNNode *n1, PNNode *n2, string name = "")=0;
+    virtual PNNode* createArc(PNNode *n1, PNNode *n2, string name = "", unsigned wt = 1)=0;
     virtual void printdot(string filename="petri.dot")=0;
     virtual void printpnml(string filename="petri.pnml")=0;
     virtual void deleteElems()=0;
@@ -298,8 +298,11 @@ public:
     }
     // returns intermediate node if it was inserted between PP/TT else NULL
     // adds the created arc(s) and intermediate node (if any) to Elements pnes
-    // For intermediate node (if any) optional argument 'name' can be passed
-    PNNode* createArc(PNNode *n1, PNNode *n2, string name = "")
+    // For intermediate node (if any i.e. for PP/TT arguments) optional
+    // argument 'name' can be passed
+    // Optional argument 'wt' is used to assign weight to arc only for PT/TP
+    // arguments i.e. only when a single arc is created
+    PNNode* createArc(PNNode *n1, PNNode *n2, string name = "", unsigned wt = 1)
     {
         if ( n1->typ() == PNElement::TRANSITION )
         {
@@ -315,7 +318,7 @@ public:
             else
             {
                 assertPlacePresent((PNPlace*)n2);
-                _arcs.push_back(new PNTPArc((PNTransition*)n1,(PNPlace*)n2));
+                _arcs.push_back(new PNTPArc((PNTransition*)n1,(PNPlace*)n2,wt));
                 return NULL;
             }
         }
@@ -325,7 +328,7 @@ public:
             if ( n2->typ() == PNElement::TRANSITION )
             {
                 assertTransitionPresent((PNTransition*)n2);
-                _arcs.push_back(new PNPTArc((PNPlace*)n1,(PNTransition*)n2));
+                _arcs.push_back(new PNPTArc((PNPlace*)n1,(PNTransition*)n2,wt));
                 return NULL;
             }
             else
