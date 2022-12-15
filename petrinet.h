@@ -6,6 +6,9 @@
 #include <list>
 #include <queue>
 #include <set>
+#ifdef PICK_RANDOM_TRANSITION
+#   include <random>
+#endif
 #ifdef USESEQNO
 #   include <atomic>
 #endif
@@ -530,9 +533,19 @@ public:
 };
 using t_queue = priority_queue<t_pair, vector<t_pair>, PriorityLT>;
 
+// PICK_RANDOM_TRANSITION: An experimental option to pick transitions randomly.
+// Note that this does not require the stochastic models that the default
+// option uses.
+#ifdef PICK_RANDOM_TRANSITION
+    list<PNTransition*> _tq;
+    random_device _rng;
+    uniform_int_distribution<unsigned> _udistr;
+#else
     t_queue _tq;
-// An experimental (undocumented) option to adjust the delay with the running time
-// But this has undesirable side effecto of reducing the defect detection probabilities
+#endif
+// USE_DELAY_OFFSET: An experimental option to adjust the delay with the
+// running time But this has undesirable side effecto of reducing the defect
+// detection probabilities
 #ifdef USE_DELAY_OFFSET
     double _offset = 0;
 #endif
@@ -552,8 +565,17 @@ using t_queue = priority_queue<t_pair, vector<t_pair>, PriorityLT>;
 #ifdef USE_DELAY_OFFSET
             _offset += _tq.top().first;
 #endif
+
+#ifdef PICK_RANDOM_TRANSITION
+            int pick = _udistr(_rng) % _tq.size();
+            auto it = _tq.begin();
+            advance(it,pick);
+            auto t = *it;
+            _tq.erase(it);
+#else
             auto t = _tq.top().second;
             _tq.pop();
+#endif
             _tqmutex.unlock();
             // this was checked when adding to _tq, but marking may change
             // till its turn comes, so check again
@@ -598,7 +620,9 @@ public:
             if ( t->mayFire() )
             {
                 _tqmutex.lock();
-#ifdef USE_DELAY_OFFSET
+#if defined( PICK_RANDOM_TRANSITION )
+                _tq.push_back(t);
+#elif defined( USE_DELAY_OFFSET )
                 _tq.push( { t->delay() + _offset, t } );
 #else
                 _tq.push( { t->delay(), t } );
