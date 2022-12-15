@@ -6,7 +6,7 @@
 #include <list>
 #include <queue>
 #include <set>
-#ifdef PICK_RANDOM_TRANSITION
+#if defined( PICK_RANDOM_TRANSITION ) || defined( USE_UNIFORM_DELAY )
 #   include <random>
 #endif
 #ifdef USESEQNO
@@ -536,10 +536,16 @@ using t_queue = priority_queue<t_pair, vector<t_pair>, PriorityLT>;
 // PICK_RANDOM_TRANSITION: An experimental option to pick transitions randomly.
 // Note that this does not require the stochastic models that the default
 // option uses.
+// USE_UNIFORM_DELAY: An experimental option to use a local random number
+// generator and uniformly distributed delay disregarding user supplied delay.
 #ifdef PICK_RANDOM_TRANSITION
     list<PNTransition*> _tq;
     random_device _rng;
     uniform_int_distribution<unsigned> _udistr;
+#elif defined ( USE_UNIFORM_DELAY )
+    t_queue _tq;
+    random_device _rng;
+    uniform_real_distribution<double> _udistr {-1,1};
 #else
     t_queue _tq;
 #endif
@@ -622,6 +628,8 @@ public:
                 _tqmutex.lock();
 #if defined( PICK_RANDOM_TRANSITION )
                 _tq.push_back(t);
+#elif defined( USE_UNIFORM_DELAY )
+                _tq.push( { _udistr(_rng), t } );
 #elif defined( USE_DELAY_OFFSET )
                 _tq.push( { t->delay() + _offset, t } );
 #else
