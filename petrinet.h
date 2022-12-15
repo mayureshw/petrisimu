@@ -531,6 +531,11 @@ public:
 using t_queue = priority_queue<t_pair, vector<t_pair>, PriorityLT>;
 
     t_queue _tq;
+// An experimental (undocumented) option to adjust the delay with the running time
+// But this has undesirable side effecto of reducing the defect detection probabilities
+#ifdef USE_DELAY_OFFSET
+    double _offset = 0;
+#endif
     mutex _tqmutex;
     condition_variable _tq_cvar;
 
@@ -544,6 +549,9 @@ using t_queue = priority_queue<t_pair, vector<t_pair>, PriorityLT>;
                 _tqmutex.unlock();
                 break;
             }
+#ifdef USE_DELAY_OFFSET
+            _offset += _tq.top().first;
+#endif
             auto t = _tq.top().second;
             _tq.pop();
             _tqmutex.unlock();
@@ -590,7 +598,11 @@ public:
             if ( t->mayFire() )
             {
                 _tqmutex.lock();
+#ifdef USE_DELAY_OFFSET
+                _tq.push( { t->delay() + _offset, t } );
+#else
                 _tq.push( { t->delay(), t } );
+#endif
                 _tqmutex.unlock();
             }
         }
