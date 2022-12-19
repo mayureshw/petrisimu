@@ -560,7 +560,7 @@ using t_queue = priority_queue<t_pair, vector<t_pair>, PriorityLT>;
 
     void _simuloop()
     {
-        while ( true )
+        while ( not _quit )
         {
             _tqmutex.lock();
             if ( _tq.empty() )
