@@ -1,12 +1,48 @@
 #ifndef _PETRINET_H
 #define _PETRINET_H
 
+// 1. The MTPetriNet class implements a high performance mode, with no control
+// over transition sequence. This class is suitable for basic behavioral
+// simulations, but not useful for verification by randomization.
+//
+// 2. The STPetriNet class implements a stochastic timed petri net simulation
+// which offers control over randomization of event sequences. This class may
+// be useful for property verifications by randomized simulations. The
+// randomization strategy depends on the compile time flag passed as follows:
+//
+// SIMU_MODE_RANDOMPRIO :   Transitions are assigned a uniform random priority
+//                          as soon as they get enabled. Most useful mode for
+//                          property verification by randomized simulation. The
+//                          probability of hitting corner case sequences is
+//                          higher in this mode.
+//
+// SIMU_MODE_RANDOMPICK :   Transitions are picked uniformly randomly from
+//                          among enabled transitions. At present this is just
+//                          an experimental mode.
+//
+// SIMU_MODE_STPN       :   This is just like the Default mode explained below,
+//                          just that the simulation time tracked and advanced
+//                          after processing every transition. The transitions
+//                          enabled first tend to get a higher priority than a
+//                          transition enabled later. Hence this mode may not
+//                          be useful for uncovering rarely occurring
+//                          transition sequences as compared to
+//                          SIMU_MODE_RANDOMPICK. But, this mode provides
+//                          classical STPN simulations. Consider attaching
+//                          probability distribution functions with the
+//                          transition in your application. This functionality
+//                          is not included in this simulator.
+//
+// Default              :   Transitions are assigned with a delay using
+//                          callback function set using setDelayFn. Default
+//                          delay (if setDelayFn isn't called) is 0.
+
 #include <iostream>
 #include <string>
 #include <list>
 #include <queue>
 #include <set>
-#if defined( PICK_RANDOM_TRANSITION ) || defined( USE_UNIFORM_DELAY )
+#if defined( SIMU_MODE_RANDOMPICK ) || defined( SIMU_MODE_RANDOMPRIO )
 #   include <random>
 #endif
 #ifdef USESEQNO
@@ -533,26 +569,19 @@ public:
 };
 using t_queue = priority_queue<t_pair, vector<t_pair>, PriorityLT>;
 
-// PICK_RANDOM_TRANSITION: An experimental option to pick transitions randomly.
-// Note that this does not require the stochastic models that the default
-// option uses.
-// USE_UNIFORM_DELAY: An experimental option to use a local random number
-// generator and uniformly distributed delay disregarding user supplied delay.
-#ifdef PICK_RANDOM_TRANSITION
+#ifdef SIMU_MODE_RANDOMPICK
     list<PNTransition*> _tq;
     random_device _rng;
     uniform_int_distribution<unsigned> _udistr;
-#elif defined ( USE_UNIFORM_DELAY )
+#elif defined ( SIMU_MODE_RANDOMPRIO )
     t_queue _tq;
     random_device _rng;
     uniform_real_distribution<double> _udistr {-1,1};
 #else
     t_queue _tq;
 #endif
-// USE_DELAY_OFFSET: An experimental option to adjust the delay with the
-// running time But this has undesirable side effecto of reducing the defect
-// detection probabilities
-#ifdef USE_DELAY_OFFSET
+
+#ifdef SIMU_MODE_STPN
     double _offset = 0;
 #endif
     mutex _tqmutex;
@@ -568,11 +597,11 @@ using t_queue = priority_queue<t_pair, vector<t_pair>, PriorityLT>;
                 _tqmutex.unlock();
                 break;
             }
-#ifdef USE_DELAY_OFFSET
+#ifdef SIMU_MODE_STPN
             _offset += _tq.top().first;
 #endif
 
-#ifdef PICK_RANDOM_TRANSITION
+#ifdef SIMU_MODE_RANDOMPICK
             int pick = _udistr(_rng) % _tq.size();
             auto it = _tq.begin();
             advance(it,pick);
@@ -626,11 +655,11 @@ public:
             if ( t->mayFire() )
             {
                 _tqmutex.lock();
-#if defined( PICK_RANDOM_TRANSITION )
+#if defined( SIMU_MODE_RANDOMPICK )
                 _tq.push_back(t);
-#elif defined( USE_UNIFORM_DELAY )
+#elif defined( SIMU_MODE_RANDOMPRIO )
                 _tq.push( { _udistr(_rng), t } );
-#elif defined( USE_DELAY_OFFSET )
+#elif defined( SIMU_MODE_STPN )
                 _tq.push( { t->delay() + _offset, t } );
 #else
                 _tq.push( { t->delay(), t } );
