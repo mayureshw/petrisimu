@@ -560,13 +560,13 @@ class STPetriNet : public PetriNetBase
 {
 using PetriNetBase::PetriNetBase;
 using t_pair  = pair<double, PNTransition*>;
-// Saves the overhead of comparing 2nd member of the pair
-class PriorityLT
-{
-public:
-    // Since delay is opposite of priority, we use >
-    bool operator() (t_pair& l, t_pair& r) { return l.first > r.first; }
-};
+    // Saves the overhead of comparing 2nd member of the pair
+    class PriorityLT
+    {
+    public:
+        // Since delay is opposite of priority, we use >
+        bool operator() (t_pair& l, t_pair& r) { return l.first > r.first; }
+    };
 using t_queue = priority_queue<t_pair, vector<t_pair>, PriorityLT>;
 
 #ifdef SIMU_MODE_RANDOMPICK
