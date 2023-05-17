@@ -177,6 +177,7 @@ public:
         else return _oarcs;
     }
     void setMarking(unsigned marking) { _marking = marking; }
+    void setCapacity(unsigned capacity) { _capacity = capacity; }
     // This can be put on queue by adding a wrapper that does addwork, for granularity reason it wasn't
     unsigned marking() { return _marking; }
     unsigned capacity() { return _capacity; }
