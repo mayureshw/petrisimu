@@ -50,6 +50,7 @@
 #endif
 #include "dot.h"
 #include "mtengine.h"
+#include "jsonprinter.h"
 
 #ifdef PNDBG
 #   define PNLOG(ARGS) \
@@ -178,6 +179,7 @@ public:
     void setMarking(unsigned marking) { _marking = marking; }
     // This can be put on queue by adding a wrapper that does addwork, for granularity reason it wasn't
     unsigned marking() { return _marking; }
+    unsigned capacity() { return _capacity; }
     unsigned _tokens = 0;
     Etyp typ() { return PLACE; }
     void setArcChooser(function<list<int>()> f) { _arcchooser = f; }
@@ -407,34 +409,60 @@ public:
         ofs << "</pnml>" << endl;
         ofs.close();
     }
-    // Not a json, but json like data structure readable in python (we use
-    // tuples, are not bothered about the trailing comma, can use single quoted
-    // strings etc.
-    void printjson(string filename="petri.json")
-    {
-        ofstream ofs;
-        ofs.open(filename);
-        ofs << "{" << endl;
 
-        ofs << "'places' : [" << endl;
+#   define JSONSTR(STR) JsonAtom<string> STR##_key(#STR);
+
+    void printjson(ofstream& ofs)
+    {
+        JSONSTR(transitions)
+        JSONSTR(places)
+        JSONSTR(label)
+        JSONSTR(marking)
+        JSONSTR(successors)
+
+        JsonFactory jf;
+
+        JsonMap placemap, transitionmap;
+        JsonMap top { {&places_key, &placemap}, {&transitions_key, &transitionmap} };
+
         for(auto p:_places)
         {
-            ofs << "(" << p->idstr() << ",'" << p->_name << "'," << p->marking() << ",[";
-            for(auto a:p->_oarcs) ofs << a->_transition->idstr() << ",";
-            ofs << "])," << endl;
-        }
-        ofs << "]," << endl;
+            auto idval = jf.createJsonAtom<string>(p->idstr());
+            auto thisplacemap = jf.createJsonMap();
+            placemap.push_back({idval,thisplacemap});
 
-        ofs << "'transitions' : [" << endl;
+            auto labelval = jf.createJsonAtom<string>(p->_name);
+            thisplacemap->push_back({&label_key,labelval});
+            auto markingval = jf.createJsonAtom<unsigned>(p->marking());
+            thisplacemap->push_back({&marking_key,markingval});
+
+            list<string> succlist;
+            for(auto a:p->_oarcs) succlist.push_back(a->_transition->idstr());
+            auto succval = jf.createAtomList<string>(succlist);
+            thisplacemap->push_back({&successors_key,succval});
+        }
+
         for(auto t:_transitions)
         {
-            ofs << "(" << t->idstr() << ",'" << t->_name << "',[";
-            for(auto a:t->_oarcs) ofs << a->_place->idstr() << ",";
-            ofs << "])," << endl;
-        }
-        ofs << "]," << endl;
+            auto idval = jf.createJsonAtom<string>(t->idstr());
+            auto thistransitionmap = jf.createJsonMap();
+            transitionmap.push_back({idval,thistransitionmap});
 
-        ofs << "}" << endl;
+            auto labelval = jf.createJsonAtom<string>(t->_name);
+            thistransitionmap->push_back({&label_key,labelval});
+
+            list<string> succlist;
+            for(auto a:t->_oarcs) succlist.push_back(a->_place->idstr());
+            auto succval = jf.createAtomList<string>(succlist);
+            thistransitionmap->push_back({&successors_key,succval});
+        }
+
+        top.print(ofs);
+    }
+    void printjson(string filename="petri.json")
+    {
+        ofstream ofs(filename);
+        printjson(ofs);
         ofs.close();
     }
     void printdot(string filename="petri.dot")
