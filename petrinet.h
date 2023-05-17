@@ -99,8 +99,8 @@ public:
     atomic<unsigned long> _eseqno = 0;
 #   endif
     virtual PNTransition* createTransition(string name)=0;
-    virtual PNPlace* createPlace(string name, unsigned marking=0, unsigned capacity=0)=0;
-    virtual PNQuitPlace* createQuitPlace(string name, unsigned marking=0, unsigned capacity=0)=0;
+    virtual PNPlace* createPlace(string name, unsigned marking=0, unsigned capacity=1)=0;
+    virtual PNQuitPlace* createQuitPlace(string name, unsigned marking=0, unsigned capacity=1)=0;
     virtual PNNode* createArc(PNNode *n1, PNNode *n2, string name = "", unsigned wt = 1)=0;
     virtual void printdot(string filename="petri.dot")=0;
     virtual void printpnml(string filename="petri.pnml")=0;
@@ -202,7 +202,7 @@ public:
     void unlock() { _tokenmutex.unlock(); }
     DNode dnode() { return DNode(idstr(),(Proplist){{"label","p:"+idlabel()}}); }
     // capacity 0 means place can hold unlimited tokens
-    PNPlace(string name, IPetriNet* pn, unsigned marking=0,unsigned capacity=0) : PNNode(name, pn), _capacity(capacity), _marking(marking) {}
+    PNPlace(string name, IPetriNet* pn, unsigned marking=0,unsigned capacity=1) : PNNode(name, pn), _capacity(capacity), _marking(marking) {}
     virtual ~PNPlace() {}
 };
 
@@ -306,6 +306,16 @@ protected:
     Transitions _transitions;
     Arcs _arcs;
     virtual void _postinit() {}
+    void checkPlaceCapacityException(PNPlace *p)
+    {
+        if ( p->capacity() > 0 and p->_tokens > p->capacity() )
+        {
+            cout << "Place capacity exception: place:" << p->idlabel()
+                << " tokens:" << p->_tokens  << " capacity:" << p->capacity()
+                << endl;
+            exit(1);
+        }
+    }
     // Note: Fire is to be called after deducting tokens from sources
     // it will add tokens to destinations
     void fire(PNTransition* t)
@@ -325,13 +335,13 @@ public:
         _transitions.insert(t);
         return t;
     }
-    PNPlace* createPlace(string name, unsigned marking=0, unsigned capacity=0)
+    PNPlace* createPlace(string name, unsigned marking=0, unsigned capacity=1)
     {
         auto p = new PNPlace(name, this, marking, capacity);
         _places.insert(p);
         return p;
     }
-    PNQuitPlace* createQuitPlace(string name, unsigned marking=0, unsigned capacity=0)
+    PNQuitPlace* createQuitPlace(string name, unsigned marking=0, unsigned capacity=1)
     {
         auto p = new PNQuitPlace(name, this, marking, capacity);
         _places.insert(p);
@@ -418,6 +428,7 @@ public:
         JSONSTR(places)
         JSONSTR(label)
         JSONSTR(marking)
+        JSONSTR(capacity)
         JSONSTR(successors)
 
         JsonFactory jf;
@@ -435,6 +446,8 @@ public:
             thisplacemap->push_back({&label_key,labelval});
             auto markingval = jf.createJsonAtom<unsigned>(p->marking());
             thisplacemap->push_back({&marking_key,markingval});
+            auto capacityval = jf.createJsonAtom<unsigned>(p->capacity());
+            thisplacemap->push_back({&capacity_key,capacityval});
 
             list<string> succlist;
             for(auto a:p->_oarcs) succlist.push_back(a->_transition->idstr());
@@ -568,6 +581,9 @@ public:
         place->lock();
         unsigned oldcnt = place->_tokens;
         place->_tokens += newtokens;
+#       ifdef PN_PLACE_CAPACITY_EXCEPTION
+        checkPlaceCapacityException(place);
+#       endif
         for(auto oarc:eligibleArcs)
             // inform the transition only if we crossed the threshold now
             // Think, whether we want to randomize the sequence of oarc for non
@@ -674,6 +690,9 @@ public:
     {
         place->lock();
         place->_tokens += newtokens;
+#       ifdef PN_PLACE_CAPACITY_EXCEPTION
+        checkPlaceCapacityException(place);
+#       endif
         place->unlock();
         place->addactions(newtokens);
         Arcs eligibleArcs = place->eligibleArcs();
