@@ -311,10 +311,8 @@ protected:
     {
         if ( p->capacity() > 0 and p->_tokens > p->capacity() )
         {
-            cout << "Place capacity exception: place:" << p->idlabel()
-                << " tokens:" << p->_tokens  << " capacity:" << p->capacity()
-                << endl;
-            exit(1);
+            cout << "PN_PLACE_CAPACITY_EXCEPTION:" << p->idlabel() << ":"
+                << p->capacity() << ":" << p->_tokens << endl;
         }
     }
     // Note: Fire is to be called after deducting tokens from sources
@@ -328,6 +326,18 @@ protected:
         t->enabledactions ( 0 );
 #       endif
         for(auto oarc:t->_oarcs) addtokens(oarc->_place, oarc->_wt);
+    }
+    // Does json conversion actions that are common to places and transitions
+    JsonMap* node2json(JsonFactory& jf, JsonMap& nodemap, PNNode* n, JsonKey& label_key)
+    {
+        auto idval = jf.createJsonAtom<string>(n->idstr());
+        auto thisnodemap = jf.createJsonMap();
+        nodemap.push_back({idval,thisnodemap});
+
+        auto labelval = jf.createJsonAtom<string>(n->_name);
+        thisnodemap->push_back({&label_key,labelval});
+
+        return thisnodemap;
     }
 public:
     PNTransition* createTransition(string name)
@@ -421,54 +431,52 @@ public:
         ofs.close();
     }
 
-#   define JSONSTR(STR) JsonAtom<string> STR##_key(#STR);
-
+#   define JSONSTR(STR) JsonKey STR##_key(#STR);
     void printjson(ofstream& ofs)
     {
-        JSONSTR(transitions)
-        JSONSTR(places)
         JSONSTR(label)
+        JSONSTR(places)
+        JSONSTR(transitions)
+        JSONSTR(arcs)
         JSONSTR(marking)
         JSONSTR(capacity)
-        JSONSTR(successors)
+        JSONSTR(src)
+        JSONSTR(tgt)
+        JSONSTR(wt)
 
         JsonFactory jf;
 
         JsonMap placemap, transitionmap;
-        JsonMap top { {&places_key, &placemap}, {&transitions_key, &transitionmap} };
+        JsonList arclist;
+        JsonMap top {
+                { &places_key,      &placemap      },
+                { &transitions_key, &transitionmap },
+                { &arcs_key,        &arclist       },
+            };
 
         for(auto p:_places)
         {
-            auto idval = jf.createJsonAtom<string>(p->idstr());
-            auto thisplacemap = jf.createJsonMap();
-            placemap.push_back({idval,thisplacemap});
+            auto thisplacemap = node2json(jf, placemap, p, label_key);
 
-            auto labelval = jf.createJsonAtom<string>(p->_name);
-            thisplacemap->push_back({&label_key,labelval});
             auto markingval = jf.createJsonAtom<unsigned>(p->marking());
-            thisplacemap->push_back({&marking_key,markingval});
+            thisplacemap->push_back( { &marking_key, markingval } );
             auto capacityval = jf.createJsonAtom<unsigned>(p->capacity());
-            thisplacemap->push_back({&capacity_key,capacityval});
-
-            list<string> succlist;
-            for(auto a:p->_oarcs) succlist.push_back(a->_transition->idstr());
-            auto succval = jf.createAtomList<string>(succlist);
-            thisplacemap->push_back({&successors_key,succval});
+            thisplacemap->push_back( { &capacity_key, capacityval } );
         }
 
-        for(auto t:_transitions)
+        for(auto t:_transitions) node2json(jf, transitionmap, t, label_key);
+
+        for(auto a:_arcs)
         {
-            auto idval = jf.createJsonAtom<string>(t->idstr());
-            auto thistransitionmap = jf.createJsonMap();
-            transitionmap.push_back({idval,thistransitionmap});
+            auto thisarcmap = jf.createJsonMap();
+            arclist.push_back(thisarcmap);
 
-            auto labelval = jf.createJsonAtom<string>(t->_name);
-            thistransitionmap->push_back({&label_key,labelval});
-
-            list<string> succlist;
-            for(auto a:t->_oarcs) succlist.push_back(a->_place->idstr());
-            auto succval = jf.createAtomList<string>(succlist);
-            thistransitionmap->push_back({&successors_key,succval});
+            auto srcval = jf.createJsonAtom<string>(a->source()->idstr());
+            thisarcmap->push_back( { &src_key, srcval } );
+            auto tgtval = jf.createJsonAtom<string>(a->target()->idstr());
+            thisarcmap->push_back( { &tgt_key, tgtval } );
+            auto wtval = jf.createJsonAtom<unsigned>(a->_wt);
+            thisarcmap->push_back( { &wt_key, wtval } );
         }
 
         top.print(ofs);
