@@ -126,4 +126,7 @@ public:
     ~JsonFactory() { for(auto o:_objs) delete o; }
 };
 
+// Convenient type, json keys are always string atoms
+typedef JsonAtom<string> JsonKey;
+
 #endif
