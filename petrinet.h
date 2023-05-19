@@ -431,7 +431,6 @@ public:
         ofs.close();
     }
 
-#   define JSONSTR(STR) JsonKey STR##_key(#STR);
     void printjson(ofstream& ofs)
     {
         JSONSTR(label)
@@ -471,9 +470,9 @@ public:
             auto thisarcmap = jf.createJsonMap();
             arclist.push_back(thisarcmap);
 
-            auto srcval = jf.createJsonAtom<string>(a->source()->idstr());
+            auto srcval = jf.createJsonAtom<unsigned>(a->source()->_nodeid);
             thisarcmap->push_back( { &src_key, srcval } );
-            auto tgtval = jf.createJsonAtom<string>(a->target()->idstr());
+            auto tgtval = jf.createJsonAtom<unsigned>(a->target()->_nodeid);
             thisarcmap->push_back( { &tgt_key, tgtval } );
             auto wtval = jf.createJsonAtom<unsigned>(a->_wt);
             thisarcmap->push_back( { &wt_key, wtval } );

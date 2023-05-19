@@ -129,4 +129,7 @@ public:
 // Convenient type, json keys are always string atoms
 typedef JsonAtom<string> JsonKey;
 
+// Creates a local declaration of JsonKey with variable name <STR>_key and value STR
+#define JSONSTR(STR) JsonKey STR##_key(#STR);
+
 #endif
