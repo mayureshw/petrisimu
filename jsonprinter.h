@@ -148,6 +148,7 @@ public:
 typedef JsonAtom<string> JsonKey;
 
 // Creates a local declaration of JsonKey with variable name <STR>_key and value STR
+// (Do watch its scope, else use createJsonAtom!)
 #define JSONSTR(STR) JsonKey STR##_key(#STR);
 
 #endif
