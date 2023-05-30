@@ -80,11 +80,29 @@ public:
 class JsonFactory
 {
     list<JsonObj*> _objs;
+    map<string, JsonAtom<string>*> _string_atommap;
+    map<unsigned, JsonAtom<unsigned>*> _unsigned_atommap;
+    template<typename T> map<T,JsonAtom<T>*>& getAtomMap()
+    {
+        if constexpr ( is_same<T,string>::value ) return _string_atommap;
+        else if constexpr ( is_same<T,unsigned>::value ) return _unsigned_atommap;
+        // TODO: Wish this was a static_assert, but 1. it always hits 2. can't print type in error message
+        else
+        {
+            cout << "JsonFactory::getAtomMap not available for type" << typeid(T).name() << endl;
+            exit(1);
+        }
+    }
 public:
+    // createJsonAtom is conservative on memory, it retains a map of values
     template<typename T> JsonAtom<T>* createJsonAtom(T val)
     {
+        map<T,JsonAtom<T>*>& atommap = getAtomMap<T>();
+        auto it = atommap.find(val);
+        if ( it != atommap.end() ) return it->second;
         auto retatom = new JsonAtom<T>(val);
         _objs.push_back(retatom);
+        atommap.emplace(val,retatom);
         return retatom;
     }
     JsonList* createJsonList()
