@@ -681,6 +681,9 @@ using t_queue = priority_queue<t_pair, vector<t_pair>, PriorityLT>;
     }
     void simuloop()
     {
+        // TODO: this needs to be a do-while loop, otherwise and early quit will exit
+        // TODO: wait call lambda should be not _tq.empty()
+        // TODO: unique_lock and wait should be in a scope (braces)
         while ( not _quit )
         {
             _simuloop();
